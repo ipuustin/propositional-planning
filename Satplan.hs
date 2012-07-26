@@ -37,7 +37,43 @@ subset smallgroup biggroup = all (`elem` biggroup) smallgroup
 
 commonelement group1 group2 = any (`elem` group1) group2
 
--- mutex support for actions
+
+-- convert any propositional logic string to conjunctive normal form
+
+-- first replace the biconditionals and conditionals, move negations
+-- invard to the literals
+
+cnfreplace (Negation a) = case a of
+                Negation i -> cnfreplace i
+                Conjunction i j -> Disjunction (cnfreplace (Negation i)) (cnfreplace (Negation j))
+                Disjunction i j -> Conjunction (cnfreplace (Negation i)) (cnfreplace (Negation j))
+                _ -> Negation $ cnfreplace a
+
+cnfreplace (Conditional a b) = cnfreplace $ Disjunction (Negation a) b
+
+cnfreplace (Biconditional a b) = cnfreplace $ Conjunction (Conditional a b) (Conditional b a) 
+
+cnfreplace (Conjunction a b) = Conjunction (cnfreplace a) (cnfreplace b)
+
+cnfreplace (Disjunction a b) = Disjunction (cnfreplace a) (cnfreplace b)
+
+cnfreplace (Variable x) = Variable x
+
+-- finally distribute disjunction over conjunction wherever possible
+
+cnfdist (Conjunction a b) = Conjunction (cnfdist a) (cnfdist b)
+
+cnfdist (Disjunction a b) = dist a b
+    where dist (Conjunction i j) (Conjunction k l) =
+                    Disjunction (cnfdist $ Conjunction i j) (cnfdist $ Conjunction k l)
+          dist (Conjunction i j) k = Conjunction (cnfdist $ Disjunction i k) (cnfdist $ Disjunction j k)
+          dist i (Conjunction j k) = Conjunction (cnfdist $ Disjunction i j) (cnfdist $ Disjunction i k)
+          dist a b = Disjunction (cnfdist a) (cnfdist b)
+
+cnfdist e = e -- negations and variables
+
+tocnf :: Expr -> Expr
+tocnf e = cnfdist $ cnfreplace e
 
 
 -- testing
