@@ -108,17 +108,17 @@ gatherconjunction (a:[]) = a
 gatherconjunction [] = Variable "TODO"
 gatherconjunction (a:as) = foldl Conjunction a as
 
-gatherdisjunction :: [Action] -> Expr
-gatherdisjunction (a:[]) = Variable $ name a
+gatherdisjunction :: [Expr] -> Expr
+gatherdisjunction (a:[]) = a
 gatherdisjunction [] = Variable "TODO"
-gatherdisjunction (a:as) = foldl Disjunction (Variable $ name a) (map (Variable . name) as)
+gatherdisjunction (a:as) = foldl Disjunction a as
 
 createsuccessorstateaxiom :: Expr -> [Action] -> [Action] -> Int -> Expr
 createsuccessorstateaxiom f doers undoers t = axiom
     where prev = t - 1
-          actioncauses f = gatherdisjunction doers
-          actiondeletes = gatherdisjunction undoers
-          axiom = Biconditional (tolvar t f) (tolvar prev $ Disjunction (actioncauses f) (Disjunction f (Negation actiondeletes)))
+          actioncauses = gatherdisjunction $ map (Variable . name) doers
+          actiondeletes = gatherdisjunction $ map (Variable . name) undoers
+          axiom = Biconditional (tolvar t f) (tolvar prev $ Disjunction (actioncauses) (Disjunction f (Negation actiondeletes)))
 
 
 
@@ -127,7 +127,7 @@ findsuccessors as fs time currenttime = expression
     where axioms = foldl getfluentaxiom [] fs
           getfluentaxiom acc f = (createsuccessorstateaxiom f (doers f) (undoers f) currenttime) : acc
           doers f = filter (hasineffects f) as
-          undoers f = filter (hasineffects (Negation f)) as
+          undoers f = filter (hasineffects (cnfreplace $ Negation f)) as
           hasineffects f a = any (== f) (effects a)
           expression = gatherconjunction axioms
 
