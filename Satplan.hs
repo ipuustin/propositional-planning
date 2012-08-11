@@ -46,7 +46,7 @@ type LeveledVariable = (Int, Expr)
 
 subset smallgroup biggroup = all (`elem` biggroup) smallgroup
 
-commonelement group1 group2 = any (`elem` group1) group2
+commonelement group1 = any (`elem` group1)
 
 
 -- convert any propositional logic string to conjunctive normal form
@@ -95,12 +95,12 @@ tolvar x (Conditional a b) = Conditional (tolvar x a) (tolvar x b)
 tolvar x (Biconditional a b) = Biconditional (tolvar x a) (tolvar x b)
 tolvar x (Conjunction a b) = Conjunction (tolvar x a) (tolvar x b)
 tolvar x (Disjunction a b) = Disjunction (tolvar x a) (tolvar x b)
-tolvar x (Variable a) = Variable $ a ++ "_" ++ (show x)
+tolvar x (Variable a) = Variable $ a ++ "_" ++ show x
 
 
 findpredicates :: ActionData a => [a] -> [Expr]
 findpredicates as = List.nub $ foldl getpreds [] as
-    where getpreds acc a = acc ++ (preconditions a) ++ (effects a)
+    where getpreds acc a = acc ++ preconditions a ++ effects a
 
 
 gatherconjunction :: [Expr] -> Expr
@@ -108,32 +108,49 @@ gatherconjunction (a:[]) = a
 gatherconjunction [] = Variable "TODO"
 gatherconjunction (a:as) = foldl Conjunction a as
 
-gatherdisjunction :: [Expr] -> Expr
-gatherdisjunction (a:[]) = a
-gatherdisjunction [] = Variable "TODO"
-gatherdisjunction (a:as) = foldl Disjunction a as
+gatherdisjunction :: [Expr] -> Maybe Expr
+gatherdisjunction (a:[]) = Just a
+gatherdisjunction [] = Nothing
+gatherdisjunction (a:as) = Just $ foldl Disjunction a as
 
 createsuccessorstateaxiom :: Expr -> [Action] -> [Action] -> Int -> Expr
-createsuccessorstateaxiom f doers undoers t = axiom
-    where prev = t - 1
+createsuccessorstateaxiom f doers undoers t = let
+          next = t + 1
           actioncauses = gatherdisjunction $ map (Variable . name) doers
           actiondeletes = gatherdisjunction $ map (Variable . name) undoers
-          axiom = Biconditional (tolvar t f) (tolvar prev $ Disjunction (actioncauses) (Disjunction f (Negation actiondeletes)))
+    in
+          case (actioncauses, actiondeletes) of
+                (Just ac, Just ad) -> Biconditional (tolvar next f) (tolvar t $ Disjunction ac (Disjunction f (Negation ad)))
+                (Just ac, Nothing) -> undefined
+                (Nothing, Just ad) -> undefined
+                (Nothing, Nothing) -> undefined
 
 
 
-findsuccessors :: [Action] -> [Expr] -> Int -> Int -> Expr
-findsuccessors as fs time currenttime = expression
-    where axioms = foldl getfluentaxiom [] fs
-          getfluentaxiom acc f = (createsuccessorstateaxiom f (doers f) (undoers f) currenttime) : acc
+findsuccessors :: [Action] -> [Expr] -> Int -> Expr
+findsuccessors as fs t =
+    let 
+          axioms = foldl getfluentaxiom [] fs
+          getfluentaxiom acc f = createsuccessorstateaxiom f (doers f) (undoers f) t :acc
           doers f = filter (hasineffects f) as
-          undoers f = filter (hasineffects (cnfreplace $ Negation f)) as
-          hasineffects f a = any (== f) (effects a)
-          expression = gatherconjunction axioms
+          undoers f = filter (hasineffects $ cnfreplace $ Negation f) as
+          hasineffects f a = f `elem` effects a
+    in
+          gatherconjunction axioms
+
+findallsuccessors as fs tmax = let
+          initial = 0
+          preconditionexpr t = undefined
+          exclusionexpr t = undefined
+          successorexpr t = findsuccessors as fs t
+          exprsatlevel t = Conjunction (successorexpr t) (Conjunction (preconditionexpr t) (exclusionexpr t))
+          allexprs = [exprsatlevel x | x <- [0 .. tmax]]
+    in
+          gatherconjunction allexprs
 
 findaxioms :: [Expr] -> [Action] -> Int -> Expr
 findaxioms predicates actions time = Conjunction successorexpr (Conjunction preconditionexpr exclusionexpr)
-    where successorexpr = findsuccessors actions predicates time 1
+    where successorexpr = findsuccessors actions predicates time
           preconditionexpr = undefined
           exclusionexpr = undefined
 
