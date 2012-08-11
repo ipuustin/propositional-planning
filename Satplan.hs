@@ -86,8 +86,7 @@ cnfdist e = e -- negations and variables
 tocnf :: Expr -> Expr
 tocnf e = cnfdist $ cnfreplace e
 
-
-
+-- add the level integer to variables (literals) to indicate time
 
 tolvar :: Show a => a -> Expr -> Expr
 tolvar x (Negation a) = Negation (tolvar x a)
@@ -98,8 +97,10 @@ tolvar x (Disjunction a b) = Disjunction (tolvar x a) (tolvar x b)
 tolvar x (Variable a) = Variable $ a ++ "_" ++ show x
 
 
-findpredicates :: ActionData a => [a] -> [Expr]
-findpredicates as = List.nub $ foldl getpreds [] as
+-- gather all possible fluents (conditions) from the actions
+
+findfluents :: ActionData a => [a] -> [Expr]
+findfluents as = foldl getpreds [] as -- contains duplicates
     where getpreds acc a = acc ++ preconditions a ++ effects a
 
 
@@ -113,6 +114,8 @@ gatherdisjunction (a:[]) = Just a
 gatherdisjunction [] = Nothing
 gatherdisjunction (a:as) = Just $ foldl Disjunction a as
 
+-- successor-state axioms, precondition axioms, action exclusion axioms
+
 createsuccessorstateaxiom :: Expr -> [Action] -> [Action] -> Int -> Expr
 createsuccessorstateaxiom f doers undoers t = let
           next = t + 1
@@ -121,15 +124,12 @@ createsuccessorstateaxiom f doers undoers t = let
     in
           case (actioncauses, actiondeletes) of
                 (Just ac, Just ad) -> Biconditional (tolvar next f) (tolvar t $ Disjunction ac (Disjunction f (Negation ad)))
-                (Just ac, Nothing) -> undefined
-                (Nothing, Just ad) -> undefined
-                (Nothing, Nothing) -> undefined
-
-
+                (Just ac, Nothing) -> Biconditional (tolvar next f) (tolvar t $ Disjunction ac f)
+                (Nothing, Just ad) -> Biconditional (tolvar next f) (tolvar t $ Disjunction f (Negation ad))
+                (Nothing, Nothing) -> Biconditional (tolvar next f) (tolvar t f)
 
 findsuccessors :: [Action] -> [Expr] -> Int -> Expr
-findsuccessors as fs t =
-    let 
+findsuccessors as fs t = let
           axioms = foldl getfluentaxiom [] fs
           getfluentaxiom acc f = createsuccessorstateaxiom f (doers f) (undoers f) t :acc
           doers f = filter (hasineffects f) as
@@ -138,8 +138,8 @@ findsuccessors as fs t =
     in
           gatherconjunction axioms
 
+findallsuccessors :: [Action] -> [Expr] -> Int -> Expr
 findallsuccessors as fs tmax = let
-          initial = 0
           preconditionexpr t = undefined
           exclusionexpr t = undefined
           successorexpr t = findsuccessors as fs t
@@ -147,12 +147,6 @@ findallsuccessors as fs tmax = let
           allexprs = [exprsatlevel x | x <- [0 .. tmax]]
     in
           gatherconjunction allexprs
-
-findaxioms :: [Expr] -> [Action] -> Int -> Expr
-findaxioms predicates actions time = Conjunction successorexpr (Conjunction preconditionexpr exclusionexpr)
-    where successorexpr = findsuccessors actions predicates time
-          preconditionexpr = undefined
-          exclusionexpr = undefined
 
 -- create the CNF and the mapping from the problem
 
@@ -165,8 +159,7 @@ translatetosat (Problem initials actions goals) time = (cnfexpr, mapping)
           goalexpr = foldl Conjunction g gs
           cnfexpr = Conjunction startexpr (Conjunction successorexpr goalexpr)
           mapping = []
-          predicates = findpredicates actions
--- successor-state axioms, precondition axioms, action exclusion axioms
+          fluents = List.nub $ findfluents actions ++ initials ++ goals
 
 
 
