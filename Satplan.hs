@@ -38,7 +38,8 @@ data Plan = Plan [Action] | Impossible deriving (Show)
 -- desired goal state
 data Problem = Problem [Expr] [Action] [Expr]
 
-type VariableMapping = [(Int, Expr)]
+type VariableMapping = [(Expr, Int)]
+type VariableMap = Map Integer String
 
 type LeveledVariable = (Int, Expr)
 
@@ -79,8 +80,8 @@ cnfdist e = e -- negations and variables
 tocnf :: Expr -> Expr
 tocnf e = cnfdist $ cnfreplace e
 
--- add the level integer to variables (literals) to indicate time
 
+{-
 tolvar :: Show a => a -> Expr -> Expr
 tolvar x (Negation a) = Negation (tolvar x a)
 tolvar x (Conditional a b) = Conditional (tolvar x a) (tolvar x b)
@@ -88,7 +89,28 @@ tolvar x (Biconditional a b) = Biconditional (tolvar x a) (tolvar x b)
 tolvar x (Conjunction a b) = Conjunction (tolvar x a) (tolvar x b)
 tolvar x (Disjunction a b) = Disjunction (tolvar x a) (tolvar x b)
 tolvar x (Variable a) = Variable $ a ++ "_" ++ show x
+-}
 
+
+exprmap f (Negation a) = Negation (exprmap f a)
+exprmap f (Conditional a b) = Conditional (exprmap f a) (exprmap f b)
+exprmap f (Biconditional a b) = Biconditional (exprmap f a) (exprmap f b)
+exprmap f (Conjunction a b) = Conjunction (exprmap f a) (exprmap f b)
+exprmap f (Disjunction a b) = Disjunction (exprmap f a) (exprmap f b)
+exprmap f (Variable a) = Variable $ f a
+
+exprwalk f (Variable a) = [f a]
+exprwalk f (Negation a) = exprwalk f a
+exprwalk f (Conjunction a b) = exprwalk f a ++ exprwalk f b
+exprwalk f (Disjunction a b) = exprwalk f a ++ exprwalk f b
+exprwalk f (Biconditional a b) = exprwalk f a ++ exprwalk f b
+exprwalk f (Conditional a b) = exprwalk f a ++ exprwalk f b
+
+
+
+-- add the level integer to variables (literals) to indicate time
+
+tolvar x expr = exprmap (\v -> v ++ "_" ++ show x) expr
 
 -- gather all possible fluents (conditions) from the actions
 
@@ -97,6 +119,7 @@ findfluents as = foldl getpreds [] as -- contains duplicates
     where getpreds acc a = acc ++ preconditions a ++ effects a
 
 
+-- TODO: can be Nothing
 gatherconjunction :: [Expr] -> Expr
 gatherconjunction (a:[]) = a
 gatherconjunction [] = Variable "TODO"
@@ -143,6 +166,7 @@ interference a1 a2 =
         || any Prop.isContradiction [Conjunction ex1 ex2 | ex1 <- pre1, ex2 <- ef2]
 
 -- TODO: can be Nothing
+-- TODO: now we get duplicates not(a1 & a2) && not(a2 and a1) ?
 findexclusions :: [Action] -> Expr
 findexclusions actions = let
           mutexes = [(a1, a2) | a1 <- actions, a2 <- actions, a1 /= a2 && interference a1 a2]
@@ -168,18 +192,24 @@ findallsuccessors as fs tmax = let
     in
           gatherconjunction allexprs
 
+
+createmapping :: Expr -> Map Integer String
+createmapping expr = Map.fromList $ zip [1..] $ List.nub $ exprwalk id expr
+
 -- create the CNF and the mapping from the problem
 
-translatetosat :: Problem -> Int -> (Expr, VariableMapping)
-translatetosat (Problem initials actions goals) time = (cnfexpr, mapping)
+translatetosat :: Problem -> Int -> (Expr, VariableMap)
+translatetosat (Problem initials actions goals) tmax = (cnfexpr, mapping)
     where i:is = map (tocnf . tolvar 0) initials
-          g:gs = map (tocnf . tolvar time) goals
-          startexpr = foldl Conjunction i is
-          successorexpr = undefined
-          goalexpr = foldl Conjunction g gs
-          cnfexpr = Conjunction startexpr (Conjunction successorexpr goalexpr)
-          mapping = []
+          g:gs = map (tocnf . tolvar tmax) goals
           fluents = List.nub $ findfluents actions ++ initials ++ goals
+          startexpr = foldl Conjunction i is
+          successorexpr = findallsuccessors actions fluents tmax
+          goalexpr = foldl Conjunction g gs
+          mapping = createmapping cnfexpr
+          cnfexpr = tocnf $ Conjunction startexpr (Conjunction successorexpr goalexpr)
+
+
 
 
 
