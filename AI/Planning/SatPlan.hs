@@ -13,7 +13,7 @@ A library for solving planning problems using the "planning as satisfiability"
 
 module AI.Planning.SatPlan (Action(..),
                             Problem(..),
-                            ActionData(..).
+                            ActionData(..),
                             runSat,
                             satSolve)
 

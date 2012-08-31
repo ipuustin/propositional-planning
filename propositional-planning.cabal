@@ -12,6 +12,7 @@ Copyright: Copyright (C) 2012 Ismo Puustinen
 Category:            AI
 -- Extra-source-files:
 Cabal-version:       >=1.2
+Build-type:          Simple
 
 Library
   Exposed-modules: AI.Planning, AI.Planning.SatPlan
