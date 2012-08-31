@@ -1,6 +1,14 @@
+module AI.Planning.SatPlan (Action,
+                            Problem,
+                            runSat,
+                            satSolve)
+
+where
+
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.List as List
+
 import Control.Monad
 import Text.Regex
 -- package "hatt"
@@ -227,6 +235,7 @@ convertToList stoi (Variable a) = [disjunctionToList stoi $ Variable a]
 convertToList stoi (Negation (Variable a)) = [disjunctionToList stoi $ Negation (Variable a)]
 
 
+convertToBoolean :: Map String Int -> Expr -> Boolean
 convertToBoolean stoi (Negation a) = Not (convertToBoolean stoi a)
 convertToBoolean stoi (Conjunction a b) = convertToBoolean stoi a :&&: convertToBoolean stoi b
 convertToBoolean stoi (Disjunction a b) = convertToBoolean stoi a :||: convertToBoolean stoi b
@@ -234,7 +243,7 @@ convertToBoolean stoi (Variable a) = case Map.lookup (show a) stoi of
         Just i -> Var i
 
 
--- run the sat solver
+-- run the sat solver once for a certain level
 
 satSolve :: Problem -> Int -> Maybe [(Int, String)]
 satSolve prob@(Problem i as g) t = do
@@ -263,40 +272,4 @@ runSat prob tmax = runSatInstance 0 tmax
         where runSatInstance t tmax = case satSolve prob t of
                     Nothing -> if t < tmax then runSatInstance (t+1) tmax else Nothing
                     result -> result
-
--- testing
-
-flactions = [a, b, c, d]
-    where a = Action "PlaceCap()" [Negation (Variable "On(Cap)")] [Variable "On(Cap)"] 1
-          b = Action "RemoveCap()" [Variable "On(Cap)"] [Negation (Variable "On(Cap)")] 1
-          c = Action "Insert(Battery1)" [Negation (Variable "On(Cap)"), Negation (Variable "In(Battery1)")] [Variable "In(Battery1)"] 1
-          d = Action "Insert(Battery2)" [Negation (Variable "On(Cap)"), Negation (Variable "In(Battery2)")] [Variable "In(Battery2)"] 1
-
-flinitialstate = [Variable "On(Cap)", Negation (Variable "In(Battery1)"), Negation (Variable "In(Battery2)")]
-
-flgoalstate = [Variable "On(Cap)", Variable "In(Battery1)", Variable "In(Battery2)"]
-
-flprob = Problem flinitialstate flactions flgoalstate
-
-
-
-actions1 = [a]
-    where a = Action "Action()" [Variable "Precondition()"] [Variable "Effect()"] 1
-
-initialstate1 = [Variable "Precondition()", Negation (Variable "Effect()") ]
-
-goalstate1 = [Variable "Effect()"]
-
-prob1 = Problem initialstate1 actions1 goalstate1
-
-
-
-actions2 = [a]
-    where a = Action "Action()" [Variable "Precondition()"] [Negation (Variable "Effect()")] 1
-
-initialstate2 = [Variable "Precondition()", Variable "Effect()"]
-
-goalstate2 = [Negation (Variable "Effect()")]
-
-prob2 = Problem initialstate2 actions2 goalstate2
 
