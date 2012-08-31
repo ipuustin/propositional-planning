@@ -1,3 +1,2 @@
-* Refactor the types Action and Problem to be in module AI.Planning
 * Write a test program to run tests and check the result
 * Do some planning benchmarks?
