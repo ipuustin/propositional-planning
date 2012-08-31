@@ -1,12 +1,10 @@
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.List as List
-import Debug.Trace as Trace
+import Control.Monad
+import Text.Regex
 -- package "hatt"
 import Data.Logic.Propositional as Prop
-import Text.Regex
-import Control.Monad
-
 -- package incremental-sat-solver
 import Data.Boolean.SatSolver
 
@@ -48,7 +46,7 @@ cnfReplace (Negation a) = case a of
                 Disjunction i j -> Conjunction (cnfReplace (Negation i)) (cnfReplace (Negation j))
                 _ -> Negation $ cnfReplace a
 cnfReplace (Conditional a b) = cnfReplace $ Disjunction (Negation a) b
-cnfReplace (Biconditional a b) = cnfReplace $ Conjunction (Conditional a b) (Conditional b a) 
+cnfReplace (Biconditional a b) = cnfReplace $ Conjunction (Conditional a b) (Conditional b a)
 cnfReplace (Conjunction a b) = Conjunction (cnfReplace a) (cnfReplace b)
 cnfReplace (Disjunction a b) = Disjunction (cnfReplace a) (cnfReplace b)
 cnfReplace (Variable x) = Variable x
@@ -57,14 +55,14 @@ cnfReplace (Variable x) = Variable x
 
 cnfDist (Conjunction a b) = Conjunction (cnfDist a) (cnfDist b)
 
-cnfDist (Disjunction (Conjunction x y) a) = Conjunction (cnfDist $ Disjunction x a) (cnfDist $ Disjunction y a) 
-cnfDist (Disjunction a (Conjunction x y)) = Conjunction (cnfDist $ Disjunction a x) (cnfDist $ Disjunction a y) 
+cnfDist (Disjunction (Conjunction x y) a) = Conjunction (cnfDist $ Disjunction x a) (cnfDist $ Disjunction y a)
+cnfDist (Disjunction a (Conjunction x y)) = Conjunction (cnfDist $ Disjunction a x) (cnfDist $ Disjunction a y)
 
 cnfDist (Disjunction a b) = let
         a' = cnfDist a
         b' = cnfDist b
     in
-        if (a /= a' || b /= b') then
+        if a /= a' || b /= b' then
             cnfDist $ Disjunction a' b'
         else
             Disjunction a' b'
@@ -230,26 +228,24 @@ convertToList stoi (Negation (Variable a)) = [disjunctionToList stoi $ Negation 
 
 
 convertToBoolean stoi (Negation a) = Not (convertToBoolean stoi a)
-convertToBoolean stoi (Conjunction a b) = (convertToBoolean stoi a) :&&: (convertToBoolean stoi b)
-convertToBoolean stoi (Disjunction a b) = (convertToBoolean stoi a) :||: (convertToBoolean stoi b)
+convertToBoolean stoi (Conjunction a b) = convertToBoolean stoi a :&&: convertToBoolean stoi b
+convertToBoolean stoi (Disjunction a b) = convertToBoolean stoi a :||: convertToBoolean stoi b
 convertToBoolean stoi (Variable a) = case Map.lookup (show a) stoi of
         Just i -> Var i
 
 
 -- run the sat solver
 
-convertToSolver stoi expr = convertToBoolean stoi expr
-
 satSolve :: Problem -> Int -> Maybe [(Int, String)]
 satSolve prob@(Problem i as g) t = do
                     (expr, vmap) <- translateToSat prob t
-                    s <- assertTrue (convertToSolver (snd vmap) expr) newSatSolver
+                    s <- assertTrue (convertToBoolean (snd vmap) expr) newSatSolver
                     res <- solve s
                     return $ List.sort $ filter isaction $ map (getResultPair res) (Map.toAscList $ fst vmap)
         where look result (i, s) = do
                     b <- lookupVar i result
                     [literal, level] <- matchRegex reg s
-                    if (b)
+                    if b
                         then return (read level :: Int, literal)
                         else return (-1, "")
               getResultPair result pair = case look result pair of
