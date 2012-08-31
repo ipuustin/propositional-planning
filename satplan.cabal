@@ -13,7 +13,7 @@ Version:             0.1
 Synopsis:            Planning library using planning as satisfiability.
 
 -- A longer description of the package.
--- Description:         
+-- Description:
 
 -- The license under which the package is released.
 License:             BSD3
@@ -29,7 +29,7 @@ Author:              Ismo Puustinen
 Maintainer:          <ismo@iki.fi>
 
 -- A copyright notice.
--- Copyright:           
+-- Copyright:
 
 Category:            AI
 
@@ -37,7 +37,7 @@ Build-type:          Simple
 
 -- Extra files to be distributed with the package, such as examples or
 -- a README.
--- Extra-source-files:  
+-- Extra-source-files:
 
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.2
@@ -45,14 +45,14 @@ Cabal-version:       >=1.2
 
 Library
   -- Modules exported by the library.
-  -- Exposed-modules:     
-  
+  -- Exposed-modules: AI.Planning.SatPlan
+
   -- Packages needed in order to build this package.
-  Build-depends:       hatt
-  
+  Build-depends:       hatt, incremental-sat-solver
+
   -- Modules not exported by this package.
-  -- Other-modules:       
-  
+  -- Other-modules:
+
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
-  -- Build-tools:         
-  
+  -- Build-tools:
+

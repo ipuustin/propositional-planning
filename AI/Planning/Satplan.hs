@@ -1,5 +1,18 @@
-module AI.Planning.SatPlan (Action,
-                            Problem,
+{- |
+Module         : AI.Planning.SatPlan
+Copyright      : Copyright (C) 2012 Ismo Puustinen
+License        : BSD3
+Maintainer     : Ismo Puustinen <ismo@iki.fi>
+Stability      : experimental
+Portability    : portable
+
+A library for solving planning problems using the "planning as satisfiability"
+(SATPLAN) algorithm.
+-}
+
+
+module AI.Planning.SatPlan (Action(..),
+                            Problem(..),
                             runSat,
                             satSolve)
 
@@ -15,6 +28,9 @@ import Text.Regex
 import Data.Logic.Propositional as Prop
 -- package incremental-sat-solver
 import Data.Boolean.SatSolver
+
+
+-- TODO: the Action and Problem types could be refoctored to AI.Planning module
 
 type Cost = Int
 type Precondition = Expr
@@ -32,11 +48,13 @@ instance ActionData Action where
     name (Action n _ _ _) = n
     cost (Action _ _ _ c) = c
 
+-- | Action contains the action name, the preconditions the action has, the
+-- effects the action has, and the action cost.
 data Action = Action String [Precondition] [Effect] Cost
             deriving (Show, Eq)
 
--- The problem is the initial state, list of possible actions, and the
--- desired goal state
+-- | The problem is the initial state, list of possible actions, and the
+-- desired goal state.
 data Problem = Problem [Expr] [Action] [Expr]
 
 -- Map the levels to literals and the other way around
@@ -100,6 +118,7 @@ exprWalk f (Conditional a b) = exprWalk f a ++ exprWalk f b
 
 -- add the level integer to variables (literals) to indicate time
 -- TODO: could this be a monad ("variable in context")?
+toLVar :: Int -> Expr -> Expr
 toLVar x = exprMap (\v -> v ++ "_" ++ show x)
 
 -- gather all possible fluents (conditions) from the actions
@@ -243,8 +262,7 @@ convertToBoolean stoi (Variable a) = case Map.lookup (show a) stoi of
         Just i -> Var i
 
 
--- run the sat solver once for a certain level
-
+-- | Run the sat solver once for a certain action level.
 satSolve :: Problem -> Int -> Maybe [(Int, String)]
 satSolve prob@(Problem i as g) t = do
                     (expr, vmap) <- translateToSat prob t
@@ -264,9 +282,8 @@ satSolve prob@(Problem i as g) t = do
               reg = mkRegex "\"(.*)_([0-9]*)\"" -- capture "foobar" and "23" from ""foobar_23""
 
 
--- run the sat solver with increasing number of levels until success or
--- level cap is reached
-
+-- | Run the sat solver with increasing number of levels until success or
+-- level cap is reached.
 runSat :: Problem -> Int -> Maybe [(Int, String)]
 runSat prob tmax = runSatInstance 0 tmax
         where runSatInstance t tmax = case satSolve prob t of
