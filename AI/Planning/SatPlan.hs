@@ -145,7 +145,7 @@ findSuccessors as fs t = let
 
 -- create all possible mappings of strings to booleans
 createMappings :: [String] -> [Map String Bool]
-createMappings vs = map (Map.fromList . zip vs) $ assignments
+createMappings vs = map (Map.fromList . zip vs) assignments
     where assignments = replicateM (length vs) [True, False]
 
 
@@ -156,7 +156,7 @@ evalExpr (Negation a) mapping = not $ evalExpr a mapping
 evalExpr (Conjunction a b) mapping = (&&) (evalExpr a mapping) (evalExpr b mapping)
 evalExpr (Disjunction a b) mapping = (||) (evalExpr a mapping) (evalExpr b mapping)
 evalExpr (Biconditional a b) mapping = (==) (evalExpr a mapping) (evalExpr b mapping)
-evalExpr (Implication a b) mapping = (not $ evalExpr a mapping) || (evalExpr b mapping)
+evalExpr (Implication a b) mapping = not (evalExpr a mapping) || evalExpr b mapping
 
 
 -- if there is an assignment of values that makes the expression true, the expression is not a contradiction
