@@ -12,16 +12,22 @@ A library for solving propositional logic planning problems.
 
 module AI.Planning (ActionData(..),
                     Action(..),
+                    Expr(..),
                     Problem(..))
 
 where
 
--- package "hatt"
-import Data.Logic.Propositional
-
 type Cost = Int
 type Precondition = Expr
 type Effect = Expr
+
+data Expr = Conjunction Expr Expr
+          | Disjunction Expr Expr
+          | Negation Expr
+          | Implication Expr Expr
+          | Biconditional Expr Expr
+          | Variable String
+          deriving (Show, Eq)
 
 class ActionData a where
   preconditions :: a -> [Precondition]

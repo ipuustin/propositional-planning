@@ -10,10 +10,10 @@ A library for solving planning problems using the "planning as satisfiability"
 (SATPLAN) algorithm.
 -}
 
-
 module AI.Planning.SatPlan (Action(..),
                             Problem(..),
                             ActionData(..),
+                            Expr(..),
                             runSat,
                             satSolve)
 
@@ -27,11 +27,9 @@ import qualified Data.List as List
 
 import Control.Monad
 import Text.Regex
--- package "hatt"
-import Data.Logic.Propositional as Prop
--- package incremental-sat-solver
-import Data.Boolean.SatSolver
 
+-- package incremental-sat-solver
+import Data.Boolean.SatSolver as Sat
 
 -- Map the levels to literals and the other way around
 type VariableMap = (Map Int String, Map String Int)
@@ -46,8 +44,8 @@ cnfReplace (Negation a) = case a of
                 Conjunction i j -> Disjunction (cnfReplace (Negation i)) (cnfReplace (Negation j))
                 Disjunction i j -> Conjunction (cnfReplace (Negation i)) (cnfReplace (Negation j))
                 _ -> Negation $ cnfReplace a
-cnfReplace (Conditional a b) = cnfReplace $ Disjunction (Negation a) b
-cnfReplace (Biconditional a b) = cnfReplace $ Conjunction (Conditional a b) (Conditional b a)
+cnfReplace (Implication a b) = cnfReplace $ Disjunction (Negation a) b
+cnfReplace (Biconditional a b) = cnfReplace $ Conjunction (Implication a b) (Implication b a)
 cnfReplace (Conjunction a b) = Conjunction (cnfReplace a) (cnfReplace b)
 cnfReplace (Disjunction a b) = Disjunction (cnfReplace a) (cnfReplace b)
 cnfReplace (Variable x) = Variable x
@@ -74,20 +72,21 @@ cnfDist x = x
 toCnf :: Expr -> Expr
 toCnf e = cnfDist $ cnfReplace e
 
-
+exprMap :: (String -> String) -> Expr -> Expr
 exprMap f (Negation a) = Negation (exprMap f a)
-exprMap f (Conditional a b) = Conditional (exprMap f a) (exprMap f b)
+exprMap f (Implication a b) = Implication (exprMap f a) (exprMap f b)
 exprMap f (Biconditional a b) = Biconditional (exprMap f a) (exprMap f b)
 exprMap f (Conjunction a b) = Conjunction (exprMap f a) (exprMap f b)
 exprMap f (Disjunction a b) = Disjunction (exprMap f a) (exprMap f b)
 exprMap f (Variable a) = Variable $ f a
 
+exprWalk :: (String -> t) -> Expr -> [t]
 exprWalk f (Variable a) = [f a]
 exprWalk f (Negation a) = exprWalk f a
 exprWalk f (Conjunction a b) = exprWalk f a ++ exprWalk f b
 exprWalk f (Disjunction a b) = exprWalk f a ++ exprWalk f b
 exprWalk f (Biconditional a b) = exprWalk f a ++ exprWalk f b
-exprWalk f (Conditional a b) = exprWalk f a ++ exprWalk f b
+exprWalk f (Implication a b) = exprWalk f a ++ exprWalk f b
 
 
 
@@ -144,16 +143,43 @@ findSuccessors as fs t = let
           gatherConjunction axioms
 
 
--- effects of one action are in contradiction with preconditions of another action
+-- create all possible mappings of strings to booleans
+createMappings :: [String] -> [Map String Bool]
+createMappings vs = map (Map.fromList . zip vs) $ assignments
+    where assignments = replicateM (length vs) [True, False]
 
+
+-- evaluate the Expr value with certain mapping - a truth table row
+evalExpr :: Expr -> Map String Bool -> Bool
+evalExpr (Variable a) mapping = case Map.lookup a mapping of Just b -> b
+evalExpr (Negation a) mapping = not $ evalExpr a mapping
+evalExpr (Conjunction a b) mapping = (&&) (evalExpr a mapping) (evalExpr b mapping)
+evalExpr (Disjunction a b) mapping = (||) (evalExpr a mapping) (evalExpr b mapping)
+evalExpr (Biconditional a b) mapping = (==) (evalExpr a mapping) (evalExpr b mapping)
+evalExpr (Implication a b) mapping = (not $ evalExpr a mapping) || (evalExpr b mapping)
+
+
+-- if there is an assignment of values that makes the expression true, the expression is not a contradiction
+isContradiction :: Expr -> Bool
+isContradiction expr = let
+          -- walk through the expression and get all unique variables out
+          values = List.nub $ exprWalk id expr
+          -- assign Trues and Falses to the variables
+          mappings = createMappings values
+    in
+          -- build a boolean expression using the assignments, see if False with all values
+          not $ any (evalExpr expr) mappings
+
+
+-- effects of one action are in contradiction with preconditions of another action
 interference :: Action -> Action -> Bool
 interference a1 a2 = let
           ef1 = effects a1
           ef2 = effects a2
           pre1 = preconditions a1
           pre2 = preconditions a2
-    in any Prop.isContradiction [Conjunction ex1 ex2 | ex1 <- ef1, ex2 <- pre2]
-        || any Prop.isContradiction [Conjunction ex1 ex2 | ex1 <- pre1, ex2 <- ef2]
+    in any isContradiction [Conjunction ex1 ex2 | ex1 <- ef1, ex2 <- pre2]
+        || any isContradiction [Conjunction ex1 ex2 | ex1 <- pre1, ex2 <- ef2]
 
 -- TODO: now we get duplicates not(a1 & a2) && not(a2 and a1) ?
 
@@ -167,7 +193,7 @@ findExclusions actions = let
 
 findPreconditions :: [Action] -> Maybe Expr
 findPreconditions as = let
-          axioms = [Conditional (Variable $ name a) (safeGatherConjunction $ preconditions a) | a <- as, not . null $ preconditions a]
+          axioms = [Implication (Variable $ name a) (safeGatherConjunction $ preconditions a) | a <- as, not . null $ preconditions a]
     in
           gatherConjunction axioms
 
@@ -234,7 +260,7 @@ convertToBoolean stoi (Negation a) = Not (convertToBoolean stoi a)
 convertToBoolean stoi (Conjunction a b) = convertToBoolean stoi a :&&: convertToBoolean stoi b
 convertToBoolean stoi (Disjunction a b) = convertToBoolean stoi a :||: convertToBoolean stoi b
 convertToBoolean stoi (Variable a) = case Map.lookup (show a) stoi of
-        Just i -> Var i
+        Just i -> Sat.Var i
 
 
 -- | Run the sat solver once for a certain action level.
@@ -247,9 +273,7 @@ satSolve prob@(Problem i as g) t = do
         where look result (i, s) = do
                     b <- lookupVar i result
                     [literal, level] <- matchRegex reg s
-                    if b
-                        then return (read level :: Int, literal)
-                        else return (-1, "")
+                    return (if b then (read level :: Int, literal) else (-1, ""))
               getResultPair result pair = case look result pair of
                     Just s -> s
               actionnames = map name as

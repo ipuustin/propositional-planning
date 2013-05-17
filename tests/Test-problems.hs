@@ -1,5 +1,3 @@
-import Data.Logic.Propositional as Prop
-
 import AI.Planning.SatPlan
 
 
