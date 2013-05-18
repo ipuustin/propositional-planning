@@ -1,18 +1,31 @@
 import AI.Planning.SatPlan
-
+import Criterion.Main
 
 -- flashlight domain, expected outcome:
--- Just [(0,"RemoveCap()"),(1,"Insert(Battery1)"),(1,"Insert(Battery2)"),(2,"PlaceCap()")]
+-- Just [(0,"RemoveCap()"),(1,"Insert(Battery1)"),(1,"Insert(Battery2)"),(1,"Insert(Battery3)"),(1,"Insert(Battery4)"),(2,"PlaceCap()")]
 
-flactions = [a, b, c, d]
+flactions = [a, b, c, d, e, f]
     where a = Action "PlaceCap()" [Negation (Variable "On(Cap)")] [Variable "On(Cap)"] 1
           b = Action "RemoveCap()" [Variable "On(Cap)"] [Negation (Variable "On(Cap)")] 1
           c = Action "Insert(Battery1)" [Negation (Variable "On(Cap)"), Negation (Variable "In(Battery1)")] [Variable "In(Battery1)"] 1
           d = Action "Insert(Battery2)" [Negation (Variable "On(Cap)"), Negation (Variable "In(Battery2)")] [Variable "In(Battery2)"] 1
+          e = Action "Insert(Battery3)" [Negation (Variable "On(Cap)"), Negation (Variable "In(Battery3)")] [Variable "In(Battery3)"] 1
+          f = Action "Insert(Battery4)" [Negation (Variable "On(Cap)"), Negation (Variable "In(Battery4)")] [Variable "In(Battery4)"] 1
 
-flinitialstate = [Variable "On(Cap)", Negation (Variable "In(Battery1)"), Negation (Variable "In(Battery2)")]
 
-flgoalstate = [Variable "On(Cap)", Variable "In(Battery1)", Variable "In(Battery2)"]
+flinitialstate = [ Variable "On(Cap)",
+                   Negation (Variable "In(Battery1)"),
+                   Negation (Variable "In(Battery2)"),
+                   Negation (Variable "In(Battery3)"),
+                   Negation (Variable "In(Battery4)")
+				 ]
+
+flgoalstate = [ Variable "On(Cap)",
+                Variable "In(Battery1)",
+                Variable "In(Battery2)",
+                Variable "In(Battery3)",
+                Variable "In(Battery4)"
+              ]
 
 flprob = Problem flinitialstate flactions flgoalstate
 
@@ -58,3 +71,9 @@ goalstate3 = [Negation (Variable "Effect()")]
 
 prob3 = Problem initialstate3 actions3 goalstate3
 
+
+-- main program benchmarks flashlight problem
+
+main = defaultMain [
+		bench "flashlight problem" $ nf (runSat flprob) 10
+	]
