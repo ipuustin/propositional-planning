@@ -20,6 +20,17 @@ Library
   -- Other-modules:
   -- Build-tools:
 
+benchmark planning-bench
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   ., tests
+  other-modules:    AI.Planning, AI.Planning.SatPlan
+  main-is:          Test-problems.hs
+  build-depends:    base,
+                    criterion,
+                    random
+  ghc-options:      -Wall
+                    -O2
+
 Source-Repository head
   type:     git
   location: git://github.com/ipuustin/propositional-planning.git
