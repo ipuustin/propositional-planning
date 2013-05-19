@@ -13,7 +13,8 @@ A library for solving propositional logic planning problems.
 module AI.Planning (ActionData(..),
                     Action(..),
                     Expr(..),
-                    Problem(..))
+                    Problem(..),
+                    generateVariables)
 
 where
 
@@ -49,3 +50,12 @@ data Action = Action String [Precondition] [Effect] Cost
 -- | The problem is the initial state, list of possible actions, and the
 -- desired goal state.
 data Problem = Problem [Expr] [Action] [Expr]
+
+
+
+-- generate variable names given name and possible values
+generateVariables :: Show a => String -> [a] -> [String]
+generateVariables fn pvs = [fn ++ "_" ++ show vn | vn <- pvs]
+
+
+

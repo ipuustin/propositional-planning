@@ -144,8 +144,8 @@ findSuccessors as fs t = let
 
 
 -- create all possible mappings of strings to booleans
-createMappings :: [String] -> [Map String Bool]
-createMappings vs = map (Map.fromList . zip vs) assignments
+createBooleanMappings :: [String] -> [Map String Bool]
+createBooleanMappings vs = map (Map.fromList . zip vs) assignments
     where assignments = replicateM (length vs) [True, False]
 
 
@@ -165,7 +165,7 @@ isContradiction expr = let
           -- walk through the expression and get all unique variables out
           values = List.nub $ exprWalk id expr
           -- assign Trues and Falses to the variables
-          mappings = createMappings values
+          mappings = createBooleanMappings values
     in
           -- build a boolean expression using the assignments, see if False with all values
           not $ any (evalExpr expr) mappings
@@ -216,6 +216,7 @@ findAllSuccessors as fs tmax = let
           foldl createConjunction Nothing [exprsatlevel x | x <- [0 .. tmax]]
 
 
+-- translate from Expr format to integers (for incremental SAT solver), keep the mapping
 createMapping :: Expr -> VariableMap
 createMapping expr = let vs = List.nub $ exprWalk show expr
     in (Map.fromList $ zip [1..] vs, Map.fromList $ zip vs [1..])
