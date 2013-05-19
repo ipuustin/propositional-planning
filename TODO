@@ -1,2 +1,3 @@
 * Write a test program to run tests and check the result
 * Do some planning benchmarks?
+* PDDL parsing support (using http://github.com/ronwalf/Planning)
