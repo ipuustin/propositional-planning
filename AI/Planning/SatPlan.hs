@@ -24,71 +24,17 @@ import AI.Planning
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.List as List
+import Data.Maybe
 
-import Control.Monad
 import Text.Regex
+
+-- import Debug.Trace
 
 -- package incremental-sat-solver
 import Data.Boolean.SatSolver as Sat
 
 -- Map the levels to literals and the other way around
 type VariableMap = (Map Int String, Map String Int)
-
--- convert any propositional logic string to conjunctive normal form
-
--- first replace the biconditionals and conditionals, move negations
--- invard to the literals
-
-cnfReplace (Negation a) = case a of
-                Negation i -> cnfReplace i
-                Conjunction i j -> Disjunction (cnfReplace (Negation i)) (cnfReplace (Negation j))
-                Disjunction i j -> Conjunction (cnfReplace (Negation i)) (cnfReplace (Negation j))
-                _ -> Negation $ cnfReplace a
-cnfReplace (Implication a b) = cnfReplace $ Disjunction (Negation a) b
-cnfReplace (Biconditional a b) = cnfReplace $ Conjunction (Implication a b) (Implication b a)
-cnfReplace (Conjunction a b) = Conjunction (cnfReplace a) (cnfReplace b)
-cnfReplace (Disjunction a b) = Disjunction (cnfReplace a) (cnfReplace b)
-cnfReplace (Variable x) = Variable x
-
--- distribute disjunction over conjunction wherever possible
-
-cnfDist (Conjunction a b) = Conjunction (cnfDist a) (cnfDist b)
-
-cnfDist (Disjunction (Conjunction x y) a) = Conjunction (cnfDist $ Disjunction x a) (cnfDist $ Disjunction y a)
-cnfDist (Disjunction a (Conjunction x y)) = Conjunction (cnfDist $ Disjunction a x) (cnfDist $ Disjunction a y)
-
-cnfDist (Disjunction a b) = let
-        a' = cnfDist a
-        b' = cnfDist b
-    in
-        if a /= a' || b /= b' then
-            cnfDist $ Disjunction a' b'
-        else
-            Disjunction a' b'
-
--- variables and negations
-cnfDist x = x
-
-toCnf :: Expr -> Expr
-toCnf e = cnfDist $ cnfReplace e
-
-exprMap :: (String -> String) -> Expr -> Expr
-exprMap f (Negation a) = Negation (exprMap f a)
-exprMap f (Implication a b) = Implication (exprMap f a) (exprMap f b)
-exprMap f (Biconditional a b) = Biconditional (exprMap f a) (exprMap f b)
-exprMap f (Conjunction a b) = Conjunction (exprMap f a) (exprMap f b)
-exprMap f (Disjunction a b) = Disjunction (exprMap f a) (exprMap f b)
-exprMap f (Variable a) = Variable $ f a
-
-exprWalk :: (String -> t) -> Expr -> [t]
-exprWalk f (Variable a) = [f a]
-exprWalk f (Negation a) = exprWalk f a
-exprWalk f (Conjunction a b) = exprWalk f a ++ exprWalk f b
-exprWalk f (Disjunction a b) = exprWalk f a ++ exprWalk f b
-exprWalk f (Biconditional a b) = exprWalk f a ++ exprWalk f b
-exprWalk f (Implication a b) = exprWalk f a ++ exprWalk f b
-
-
 
 -- add the level integer to variables (literals) to indicate time
 -- TODO: could this be a monad ("variable in context")?
@@ -105,6 +51,8 @@ findFluents = foldl getpreds [] -- contains duplicates?
 safeGatherConjunction :: [Expr] -> Expr
 safeGatherConjunction (a:[]) = a
 safeGatherConjunction (a:as) = foldl Conjunction a as
+safeGatherConjunction [] = undefined
+
 
 
 gatherConjunction :: [Expr] -> Maybe Expr
@@ -142,33 +90,6 @@ findSuccessors as fs t = let
     in
           gatherConjunction axioms
 
-
--- create all possible mappings of strings to booleans
-createBooleanMappings :: [String] -> [Map String Bool]
-createBooleanMappings vs = map (Map.fromList . zip vs) assignments
-    where assignments = replicateM (length vs) [True, False]
-
-
--- evaluate the Expr value with certain mapping - a truth table row
-evalExpr :: Expr -> Map String Bool -> Bool
-evalExpr (Variable a) mapping = case Map.lookup a mapping of Just b -> b
-evalExpr (Negation a) mapping = not $ evalExpr a mapping
-evalExpr (Conjunction a b) mapping = (&&) (evalExpr a mapping) (evalExpr b mapping)
-evalExpr (Disjunction a b) mapping = (||) (evalExpr a mapping) (evalExpr b mapping)
-evalExpr (Biconditional a b) mapping = (==) (evalExpr a mapping) (evalExpr b mapping)
-evalExpr (Implication a b) mapping = not (evalExpr a mapping) || evalExpr b mapping
-
-
--- if there is an assignment of values that makes the expression true, the expression is not a contradiction
-isContradiction :: Expr -> Bool
-isContradiction expr = let
-          -- walk through the expression and get all unique variables out
-          values = List.nub $ exprWalk id expr
-          -- assign Trues and Falses to the variables
-          mappings = createBooleanMappings values
-    in
-          -- build a boolean expression using the assignments, see if False with all values
-          not $ any (evalExpr expr) mappings
 
 
 -- effects of one action are in contradiction with preconditions of another action
@@ -221,15 +142,6 @@ createMapping :: Expr -> VariableMap
 createMapping expr = let vs = List.nub $ exprWalk show expr
     in (Map.fromList $ zip [1..] vs, Map.fromList $ zip vs [1..])
 
--- create the CNF and the mapping from the problem
-
-translateToSat :: Problem -> Int -> Maybe (Expr, VariableMap)
-translateToSat prob tmax =
-    do
-        cnfexpr <- fmap cnfReplace $ translateToExpr prob tmax
-        let mapping = createMapping cnfexpr
-        return (cnfexpr, mapping)
-
 
 translateToExpr :: Problem -> Int -> Maybe Expr
 translateToExpr (Problem initials actions goals) tmax = let
@@ -239,44 +151,42 @@ translateToExpr (Problem initials actions goals) tmax = let
           startexpr = foldl Conjunction i is
           successorexpr = findAllSuccessors actions fluents (tmax-1)
           goalexpr = foldl Conjunction g gs
+          expr = createConjunction successorexpr $ Just $ Conjunction startexpr goalexpr
     in
-          createConjunction successorexpr $ Just $ Conjunction startexpr goalexpr
+          expr
+          -- trace ("expression:" ++ show expr) expr
 
 
-disjunctionToList :: Map String Int -> Expr -> [Int]
-disjunctionToList stoi (Disjunction a b) = disjunctionToList stoi a ++ disjunctionToList stoi b
-disjunctionToList stoi (Variable a) = case Map.lookup (show a) stoi of Just i -> [i]
-disjunctionToList stoi (Negation (Variable a)) = case Map.lookup (show a) stoi of Just i -> [-i]
-
-
-convertToList :: Map String Int -> Expr -> [[Int]]
-convertToList stoi (Conjunction a b) = convertToList stoi a ++ convertToList stoi b
-convertToList stoi (Disjunction a b) = [disjunctionToList stoi $ Disjunction a b]
-convertToList stoi (Variable a) = [disjunctionToList stoi $ Variable a]
-convertToList stoi (Negation (Variable a)) = [disjunctionToList stoi $ Negation (Variable a)]
+-- | create the CNF and the mapping from the problem
+translateToSat :: Problem -> Int -> Maybe (Expr, VariableMap)
+translateToSat prob tmax =
+    do
+        cnfexpr <- fmap cnfReplace $ translateToExpr prob tmax
+        let mapping = createMapping cnfexpr
+        return (cnfexpr, mapping)
 
 
 convertToBoolean :: Map String Int -> Expr -> Boolean
 convertToBoolean stoi (Negation a) = Not (convertToBoolean stoi a)
 convertToBoolean stoi (Conjunction a b) = convertToBoolean stoi a :&&: convertToBoolean stoi b
 convertToBoolean stoi (Disjunction a b) = convertToBoolean stoi a :||: convertToBoolean stoi b
-convertToBoolean stoi (Variable a) = case Map.lookup (show a) stoi of
-        Just i -> Sat.Var i
+convertToBoolean stoi (Variable a) = Sat.Var $ fromMaybe undefined $ Map.lookup (show a) stoi
+convertToBoolean _ (Implication _ _) = undefined
+convertToBoolean _ (Biconditional _ _) = undefined
 
 
 -- | Run the sat solver once for a certain action level.
 satSolve :: Problem -> Int -> Maybe [(Int, String)]
-satSolve prob@(Problem i as g) t = do
+satSolve prob@(Problem _ as _) t = do
                     (expr, vmap) <- translateToSat prob t
                     s <- assertTrue (convertToBoolean (snd vmap) expr) newSatSolver
                     res <- solve s
                     return $ List.sort $ filter isaction $ map (getResultPair res) (Map.toAscList $ fst vmap)
-        where look result (i, s) = do
-                    b <- lookupVar i result
+        where look result (idx, s) = do
+                    b <- lookupVar idx result
                     [literal, level] <- matchRegex reg s
                     return (if b then (read level :: Int, literal) else (-1, ""))
-              getResultPair result pair = case look result pair of
-                    Just s -> s
+              getResultPair result pair = fromMaybe undefined $ look result pair
               actionnames = map name as
               isaction x = snd x `elem` actionnames
               reg = mkRegex "\"(.*)_([0-9]*)\"" -- capture "foobar" and "23" from ""foobar_23""
@@ -285,8 +195,8 @@ satSolve prob@(Problem i as g) t = do
 -- | Run the sat solver with increasing number of levels until success or
 -- level cap is reached.
 runSat :: Problem -> Int -> Maybe [(Int, String)]
-runSat prob tmax = runSatInstance 0 tmax
-        where runSatInstance t tmax = case satSolve prob t of
-                    Nothing -> if t < tmax then runSatInstance (t+1) tmax else Nothing
+runSat prob tmax = runSatInstance 0
+        where runSatInstance t = case satSolve prob t of
+                    Nothing -> if t < tmax then runSatInstance (t+1) else Nothing
                     result -> result
 
