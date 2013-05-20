@@ -27,6 +27,7 @@ benchmark planning-bench
   main-is:          Test-problems.hs
   build-depends:    base,
                     criterion,
+                    QuickCheck,
                     random
   ghc-options:      -Wall
                     -O2

@@ -2,6 +2,8 @@ import AI.Planning
 import AI.Planning.SatPlan
 import Criterion.Main
 import Data.List
+import Test.QuickCheck
+
 
 -- flashlight domain, expected outcome:
 -- Just [(0,"RemoveCap()"),(1,"Insert(Battery1)"),(1,"Insert(Battery2)"),(1,"Insert(Battery3)"),(1,"Insert(Battery4)"),(2,"PlaceCap()")]
@@ -80,7 +82,8 @@ assignVariables fn vs = fn ++ "(" ++ (intercalate "," vs) ++ ")"
 
 -- block world -- (http://icaps06.icaps-conference.org/dc-papers/paper5.pdf)
 
--- FIXME: the Negation(Variable("In()")) clauses are missing
+boxes = generateVariables "box" ['a'..'b']
+slots = generateVariables "slot" [1..3]
 
 emptySlot :: [String] -> String -> [Expr]
 emptySlot bs s = [ Negation $ Variable ("In("++b++","++s++")") | b <- bs ]
@@ -95,10 +98,10 @@ setBoxToHandler b bs = boxInHandler : otherBoxes
     where boxInHandler = Variable ("Holding("++b++")")
           otherBoxes = [ Negation $ Variable ("Holding("++ob++")") | ob <- bs, ob /= b ]
 
-boxes = generateVariables "box" ['a'..'b']
-slots = generateVariables "slot" [1..3]
-
+getBox :: Char -> String
 getBox a = head $ generateVariables "box" [a]
+
+getSlot :: Integer -> String
 getSlot x = head $ generateVariables "slot" [x]
 
 bwactions = pickups ++ putdowns
@@ -130,9 +133,9 @@ bwstate2 = emptyHandler boxes ++ slot3 ++ slot2 ++ slot1
           slot3 = emptySlot boxes $ getSlot 3
 
 bwstate3 = emptyHandler boxes ++ slot3 ++ slot2 ++ slot1
-    where slot1 = setBoxToSlot boxes (getSlot 2) (getBox 'a')
-          slot2 = setBoxToSlot boxes (getSlot 3) (getBox 'b')
-          slot3 = emptySlot boxes $ getSlot 1
+    where slot1 = emptySlot boxes $ getSlot 1
+          slot2 = setBoxToSlot boxes (getSlot 2) (getBox 'a')
+          slot3 = setBoxToSlot boxes (getSlot 3) (getBox 'b')
 
 -- not working for some reason
 bwprob1 = Problem bwstate1 bwactions bwstate2
@@ -141,10 +144,32 @@ bwprob2 = Problem bwstate2 bwactions bwstate3
 
 bwprob3 = Problem bwstate1 bwactions bwstate3
 
--- main program benchmarks flashlight problem
+bwstate2b = (setBoxToHandler (getBox 'a') boxes) ++ slot3 ++ slot2 ++ slot1
+    where slot3 = emptySlot boxes $ getSlot 3
+          slot2 = emptySlot boxes $ getSlot 2
+          slot1 = setBoxToSlot boxes (getSlot 1) (getBox 'b')
+
+-- not working!
+bwprob1b = Problem bwstate1 bwactions bwstate2b
+
+-- main program benchmarks
 
 main = defaultMain [
 		bench "flashlight problem" $ nf (runSat flprob) 10,
 		bench "block world problem 2" $ nf (runSat bwprob2) 10,
     bench "block world problem 3" $ nf (runSat bwprob3) 10
 	]
+
+-- random tests
+
+instance Arbitrary Expr where
+    arbitrary = do
+        var <- elements ["X", "Y", "Z"]
+        return $ Variable var
+
+-- quickcheck contradict
+contradict v1 v2 = if v1 == v2
+    then
+          isContradiction $ Conjunction v1 (Negation(v2))
+    else
+          not $ isContradiction $ Conjunction v1 (Negation(v2))
