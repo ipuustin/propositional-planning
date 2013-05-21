@@ -19,6 +19,7 @@ module AI.Planning (ActionData(..),
                     exprWalk,
                     exprEval,
                     isContradiction,
+                    isTautology,
                     generateVariables)
 
 where
@@ -63,13 +64,11 @@ data Action = Action String [Precondition] [Effect] Cost
 -- desired goal state.
 data Problem = Problem [Expr] [Action] [Expr]
 
-
-
 -- helper functions
-
 
 -- first replace the biconditionals and conditionals, move negations
 -- invard to the literals
+cnfReplace :: Expr -> Expr
 cnfReplace (Negation a) = case a of
                 Negation i -> cnfReplace i
                 Conjunction i j -> Disjunction (cnfReplace (Negation i)) (cnfReplace (Negation j))
@@ -83,6 +82,7 @@ cnfReplace (Variable x) = Variable x
 
 -- distribute disjunction over conjunction wherever possible
 
+cnfDist :: Expr -> Expr
 cnfDist (Conjunction a b) = Conjunction (cnfDist a) (cnfDist b)
 cnfDist (Disjunction (Conjunction x y) a) = Conjunction (cnfDist $ Disjunction x a) (cnfDist $ Disjunction y a)
 cnfDist (Disjunction a (Conjunction x y)) = Conjunction (cnfDist $ Disjunction a x) (cnfDist $ Disjunction a y)
@@ -102,6 +102,7 @@ cnfDist x = x
 toCnf :: Expr -> Expr
 toCnf e = cnfDist $ cnfReplace e
 
+-- | Future fmap?
 exprMap :: (String -> String) -> Expr -> Expr
 exprMap f (Negation a) = Negation (exprMap f a)
 exprMap f (Implication a b) = Implication (exprMap f a) (exprMap f b)
@@ -117,7 +118,6 @@ exprWalk f (Conjunction a b) = exprWalk f a ++ exprWalk f b
 exprWalk f (Disjunction a b) = exprWalk f a ++ exprWalk f b
 exprWalk f (Biconditional a b) = exprWalk f a ++ exprWalk f b
 exprWalk f (Implication a b) = exprWalk f a ++ exprWalk f b
-
 
 -- evaluate the Expr value with certain mapping - a truth table row
 exprEval :: Expr -> Map String Bool -> Bool
@@ -145,10 +145,19 @@ isContradiction expr = let
           -- build a boolean expression using the assignments, see if False with all values
           not $ any (exprEval expr) mappings
 
+-- if there is an assignment of values that makes the expression false, the expression is not a tautology
+isTautology :: Expr -> Bool
+isTautology expr = let
+          values = List.nub $ exprWalk id expr
+          mappings = createBooleanMappings values
+    in
+          all (exprEval expr) mappings
+
+removeDuplicates :: [Expr] -> [Expr]
+removeDuplicates [] = []
+removeDuplicates (e:es) = e : removeDuplicates (filter (\y -> not(isTautology $ Conjunction e y)) es)
+
 
 -- generate variable names given name and possible values
 generateVariables :: Show a => String -> [a] -> [String]
 generateVariables fn pvs = [fn ++ "_" ++ show vn | vn <- pvs]
-
-
-

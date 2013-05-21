@@ -53,8 +53,6 @@ safeGatherConjunction (a:[]) = a
 safeGatherConjunction (a:as) = foldl Conjunction a as
 safeGatherConjunction [] = undefined
 
-
-
 gatherConjunction :: [Expr] -> Maybe Expr
 gatherConjunction (a:[]) = Just a
 gatherConjunction [] = Nothing
@@ -86,7 +84,7 @@ findSuccessors as fs t = let
           getFluentAxiom acc f = createSuccessorStateAxiom f (doers f) (undoers f) t :acc
           doers f = filter (hasInEffects f) as
           undoers f = filter (hasInEffects $ cnfReplace $ Negation f) as
-          hasInEffects f a = f `elem` effects a
+          hasInEffects f a = f `elem` effects a -- FIXME: do a tautology check?
     in
           gatherConjunction axioms
 
