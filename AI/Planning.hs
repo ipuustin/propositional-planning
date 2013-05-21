@@ -153,9 +153,10 @@ isTautology expr = let
     in
           all (exprEval expr) mappings
 
+-- TODO: suspicious, write tests
 removeDuplicates :: [Expr] -> [Expr]
 removeDuplicates [] = []
-removeDuplicates (e:es) = e : removeDuplicates (filter (\y -> not(isTautology $ Conjunction e y)) es)
+removeDuplicates (e:es) = e : removeDuplicates (filter (\y -> not(isTautology $ Biconditional e y)) es)
 
 
 -- generate variable names given name and possible values

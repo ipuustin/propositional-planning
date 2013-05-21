@@ -33,7 +33,10 @@ flgoalstate = [ Variable "On(Cap)",
 
 flprob = Problem flinitialstate flactions flgoalstate
 
+-- blocks on table domain
 
+tbinitialstate = [ Variable "On(A,Table)", Variable "On(B,Table)", Variable "Clear(A)", Variable "Clear(B)" ]
+tbgoalstate = [ Variable "On(A,B)"]
 
 -- expected outcome:
 -- Just [(0,"Action()")]

@@ -84,13 +84,14 @@ findSuccessors as fs t = let
           getFluentAxiom acc f = createSuccessorStateAxiom f (doers f) (undoers f) t :acc
           doers f = filter (hasInEffects f) as
           undoers f = filter (hasInEffects $ cnfReplace $ Negation f) as
-          hasInEffects f a = f `elem` effects a -- FIXME: do a tautology check?
+          -- hasInEffects f a = f `elem` effects a -- FIXME: do a tautology check? benchmark?
+          hasInEffects f a = any isTautology $ map (\x -> Biconditional x f) $ effects a  
     in
           gatherConjunction axioms
 
 
 
--- effects of one action are in contradiction with preconditions of another action
+-- | effects of one action are in contradiction with preconditions of another action
 interference :: Action -> Action -> Bool
 interference a1 a2 = let
           ef1 = effects a1
@@ -102,6 +103,7 @@ interference a1 a2 = let
 
 -- TODO: now we get duplicates not(a1 & a2) && not(a2 and a1) ?
 
+-- | make sure conflicting actions are not run at the same time
 findExclusions :: [Action] -> Maybe Expr
 findExclusions actions = let
           mutexes = [(a1, a2) | a1 <- actions, a2 <- actions, a1 /= a2 && interference a1 a2]
@@ -110,6 +112,7 @@ findExclusions actions = let
           gatherConjunction $ map pair mutexes
 
 
+-- | for each action, if an action is taken all its preconditions must be true (A -> pre(A))
 findPreconditions :: [Action] -> Maybe Expr
 findPreconditions as = let
           axioms = [Implication (Variable $ name a) (safeGatherConjunction $ preconditions a) | a <- as, not . null $ preconditions a]
