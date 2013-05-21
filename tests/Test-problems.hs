@@ -78,7 +78,7 @@ prob3 = Problem initialstate3 actions3 goalstate3
 
 
 assignVariables :: String -> [String] -> String
-assignVariables fn vs = fn ++ "(" ++ (intercalate "," vs) ++ ")"
+assignVariables fn vs = fn ++ "(" ++ intercalate "," vs ++ ")"
 
 -- block world -- (http://icaps06.icaps-conference.org/dc-papers/paper5.pdf)
 
@@ -144,7 +144,7 @@ bwprob2 = Problem bwstate2 bwactions bwstate3
 
 bwprob3 = Problem bwstate1 bwactions bwstate3
 
-bwstate2b = (setBoxToHandler (getBox 'a') boxes) ++ slot3 ++ slot2 ++ slot1
+bwstate2b = setBoxToHandler (getBox 'a') boxes ++ slot3 ++ slot2 ++ slot1
     where slot3 = emptySlot boxes $ getSlot 3
           slot2 = emptySlot boxes $ getSlot 2
           slot1 = setBoxToSlot boxes (getSlot 1) (getBox 'b')
@@ -170,6 +170,6 @@ instance Arbitrary Expr where
 -- quickcheck contradict
 contradict v1 v2 = if v1 == v2
     then
-          isContradiction $ Conjunction v1 (Negation(v2))
+          isContradiction $ Conjunction v1 (Negation v2)
     else
-          not $ isContradiction $ Conjunction v1 (Negation(v2))
+          not $ isContradiction $ Conjunction v1 (Negation v2)
