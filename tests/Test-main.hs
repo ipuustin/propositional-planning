@@ -42,6 +42,7 @@ runTest test = case test of
         case runSat bwprob3 10 of
             Just a -> putStrLn $ "Block World problem 3: " ++ show a
             Nothing -> putStrLn "Block World problem 3: no plan found"
+    _ -> putStrLn $ "Unknown test case " ++ test
 
 
 main = do
