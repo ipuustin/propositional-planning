@@ -15,16 +15,16 @@ Cabal-version:       >=1.2
 Build-type:          Simple
 
 Library
-  Exposed-modules: AI.Planning, AI.Planning.SatPlan
-  Build-depends:      base, regex-compat, containers, incremental-sat-solver
+  Exposed-modules:   AI.Planning, AI.Planning.SatPlan
+  Build-depends:     base, regex-compat, containers, incremental-sat-solver
   -- Other-modules:
   -- Build-tools:
 
 benchmark planning-bench
   type:             exitcode-stdio-1.0
   hs-source-dirs:   ., tests
-  other-modules:    AI.Planning, AI.Planning.SatPlan
-  main-is:          Test-problems.hs
+  other-modules:    AI.Planning, AI.Planning.SatPlan, Problems
+  main-is:          Bench.hs
   build-depends:    base,
                     criterion,
                     QuickCheck,
@@ -32,7 +32,15 @@ benchmark planning-bench
   ghc-options:      -Wall
                     -O2
 
+Test-Suite planning-test
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   ., tests
+  other-modules:    AI.Planning, AI.Planning.SatPlan, Problems
+  main-is:          Test-main.hs
+  build-depends:    base,
+                    QuickCheck
+
 Source-Repository head
-  type:     git
-  location: git://github.com/ipuustin/propositional-planning.git
+  type:             git
+  location:         git://github.com/ipuustin/propositional-planning.git
 

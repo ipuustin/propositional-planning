@@ -1,9 +1,33 @@
-import AI.Planning
-import AI.Planning.SatPlan
-import Criterion.Main
+{- |
+Module         : Problems
+Copyright      : Copyright (C) 2012 Ismo Puustinen
+License        : BSD3
+Maintainer     : Ismo Puustinen <ismo@iki.fi>
+Stability      : experimental
+Portability    : portable
+
+Test problems for the planning library. These are kept in a separate file so
+that both tests and benchmarks can use them (with different build
+dependencies).
+-}
+
+module Problems (ActionData(..),
+                          Action(..),
+                          Expr(..),
+                          Problem(..),
+                          runSat,
+                          flprob,
+                          bwprob1,
+                          bwprob2,
+                          bwprob3)
+
+where
+
 import Data.List
 import Test.QuickCheck
 
+import AI.Planning
+import AI.Planning.SatPlan
 
 -- flashlight domain, expected outcome:
 -- Just [(0,"RemoveCap()"),(1,"Insert(Battery1)"),(1,"Insert(Battery2)"),(1,"Insert(Battery3)"),(1,"Insert(Battery4)"),(2,"PlaceCap()")]
@@ -155,24 +179,3 @@ bwstate2b = setBoxToHandler (getBox 'a') boxes ++ slot3 ++ slot2 ++ slot1
 -- not working!
 bwprob1b = Problem bwstate1 bwactions bwstate2b
 
--- main program benchmarks
-
-main = defaultMain [
-		bench "flashlight problem" $ nf (runSat flprob) 10,
-		bench "block world problem 2" $ nf (runSat bwprob2) 10,
-    bench "block world problem 3" $ nf (runSat bwprob3) 10
-	]
-
--- random tests
-
-instance Arbitrary Expr where
-    arbitrary = do
-        var <- elements ["X", "Y", "Z"]
-        return $ Variable var
-
--- quickcheck contradict
-contradict v1 v2 = if v1 == v2
-    then
-          isContradiction $ Conjunction v1 (Negation v2)
-    else
-          not $ isContradiction $ Conjunction v1 (Negation v2)
