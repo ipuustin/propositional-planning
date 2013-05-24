@@ -15,6 +15,8 @@ module AI.Planning (ActionData(..),
                     Problem(..),
                     toCnf,
                     cnfReplace,
+                    cnfPushNegation, -- testing
+                    cnfDist, -- testing
                     exprMap,
                     exprWalk,
                     exprEval,
@@ -66,24 +68,40 @@ data Problem = Problem [Expr] [Action] [Expr]
 
 -- helper functions
 
--- first replace the biconditionals and conditionals, move negations
--- invard to the literals
-cnfReplace :: Expr -> Expr
-cnfReplace (Negation a) = case a of
-                Negation i -> cnfReplace i
-                Conjunction i j -> Disjunction (cnfReplace (Negation i)) (cnfReplace (Negation j))
-                Disjunction i j -> Conjunction (cnfReplace (Negation i)) (cnfReplace (Negation j))
-                _ -> Negation $ cnfReplace a
-cnfReplace (Implication a b) = cnfReplace $ Disjunction (Negation a) b
-cnfReplace (Biconditional a b) = cnfReplace $ Conjunction (Implication a b) (Implication b a)
-cnfReplace (Conjunction a b) = Conjunction (cnfReplace a) (cnfReplace b)
-cnfReplace (Disjunction a b) = Disjunction (cnfReplace a) (cnfReplace b)
-cnfReplace (Variable x) = Variable x
+-- | move negations invard to the literals
+cnfPushNegation (Negation a) = case a of
+                Negation i -> cnfPushNegation i
+                Conjunction i j -> Disjunction (cnfPushNegation (Negation i)) (cnfPushNegation (Negation j))
+                Disjunction i j -> Conjunction (cnfPushNegation (Negation i)) (cnfPushNegation (Negation j))
+                x -> Negation x
+cnfPushNegation (Conjunction a b) = Conjunction (cnfPushNegation a) (cnfPushNegation b)
+cnfPushNegation (Disjunction a b) = Disjunction (cnfPushNegation a) (cnfPushNegation b)
+cnfPushNegation x = x
 
--- distribute disjunction over conjunction wherever possible
+-- | replace the biconditionals and conditionals
+cnfLimit :: Expr -> Expr
+cnfLimit (Negation a) = Negation $ cnfLimit a
+cnfLimit (Implication a b) = cnfLimit $ Disjunction (Negation a) b
+cnfLimit (Biconditional a b) = cnfLimit $ Conjunction (Implication a b) (Implication b a)
+cnfLimit (Conjunction a b) = Conjunction (cnfLimit a) (cnfLimit b)
+cnfLimit (Disjunction a b) = Disjunction (cnfLimit a) (cnfLimit b)
+cnfLimit (Variable x) = Variable x
 
+cnfReplace e = cnfPushNegation $ cnfLimit e
+
+-- | distribute disjunction over conjunction wherever possible
 cnfDist :: Expr -> Expr
 cnfDist (Conjunction a b) = Conjunction (cnfDist a) (cnfDist b)
+{-
+cnfDist (Disjunction (Conjunction a b) (Conjunction c d))
+      = Conjunction 
+          (Conjunction 
+              (cnfDist $ Disjunction a c) 
+              (cnfDist $ Disjunction b c)) 
+          (Conjunction 
+              (cnfDist $ Disjunction a d) 
+              (cnfDist $ Disjunction b d))
+-}
 cnfDist (Disjunction (Conjunction x y) a) = Conjunction (cnfDist $ Disjunction x a) (cnfDist $ Disjunction y a)
 cnfDist (Disjunction a (Conjunction x y)) = Conjunction (cnfDist $ Disjunction a x) (cnfDist $ Disjunction a y)
 cnfDist (Disjunction a b) = let
