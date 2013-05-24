@@ -14,7 +14,7 @@ module Main
 
 where
 
-import AI.Planning
+import AI.Planning as Plan
 import AI.Planning.SatPlan
 import Problems
 
@@ -29,8 +29,10 @@ runTest test = case test of
     "qc" -> do
                     putStrLn "Contradiction:"
                     quickCheck prop_iscontradiction
+                    putStrLn "CNF negation pushing:"
+                    quickCheck prop_cnfpushnegation
                     putStrLn "CNF:"
-                    quickCheck prop_iscnf
+                    quickCheckWith (stdArgs{maxSize = 17}) prop_iscnf
     "flprob" ->
         case runSat flprob 10 of
             Just a -> putStrLn $ "Flashlight problem: " ++ show a
@@ -102,12 +104,34 @@ prop_iscontradiction e = if isTautology e
           not $ isContradiction $ Negation e
 
 
-prop_cnf (Variable a) = True
-prop_cnf (Negation (Variable a)) = True
-prop_cnf (Negation _) = False
-prop_cnf (Conjunction a b) = (prop_cnf a) && (prop_cnf b)
-prop_cnf (Disjunction a b) = (prop_cnf a) && (prop_cnf b)
-prop_cnf (Implication a b) = False
-prop_cnf (Biconditional a b) = False
+isEquivalent e1 e2 = Plan.isTautology $ Biconditional e1 e2
 
-prop_iscnf e = prop_cnf $ toCnf e
+iscnf (Variable a) = True
+iscnf (Negation (Variable a)) = True
+iscnf (Negation _) = False
+iscnf (Conjunction a b) = (iscnf a) && (iscnf b)
+iscnf (Disjunction (Conjunction a b) _) = False
+iscnf (Disjunction _ (Conjunction a b)) = False
+iscnf (Disjunction a b) = (iscnf a) && (iscnf b)
+iscnf (Implication a b) = False
+iscnf (Biconditional a b) = False
+
+prop_iscnf e = 
+    let 
+        e' = toCnf e
+    in
+        iscnf e' && isEquivalent e e'
+
+
+isCnfNegationPushed (Negation (Variable a)) = True
+isCnfNegationPushed (Negation _) = False
+
+isCnfNegationPushed (Variable a) = True
+isCnfNegationPushed (Conjunction a b) = (isCnfNegationPushed a) && (isCnfNegationPushed b)
+isCnfNegationPushed (Disjunction a b) = (isCnfNegationPushed a) && (isCnfNegationPushed b)
+
+prop_cnfpushnegation e =
+    let
+        e' = Plan.cnfPushNegation $ cnfReplace e
+    in
+        isCnfNegationPushed e' && isEquivalent e e'
