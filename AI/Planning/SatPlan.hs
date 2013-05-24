@@ -84,8 +84,8 @@ findSuccessors as fs t = let
           getFluentAxiom acc f = createSuccessorStateAxiom f (doers f) (undoers f) t :acc
           doers f = filter (hasInEffects f) as
           undoers f = filter (hasInEffects $ cnfReplace $ Negation f) as
-          -- hasInEffects f a = f `elem` effects a -- FIXME: do a tautology check? benchmark?
-          hasInEffects f a = any isTautology $ map (\x -> Biconditional x f) $ effects a  
+          hasInEffects f a = f `elem` effects a -- FIXME: do a tautology check? benchmark?
+          -- hasInEffects f a = any isTautology $ map (\x -> Biconditional x f) $ effects a  
     in
           gatherConjunction axioms
 
