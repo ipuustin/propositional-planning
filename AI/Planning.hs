@@ -69,6 +69,7 @@ data Problem = Problem [Expr] [Action] [Expr]
 -- helper functions
 
 -- | move negations invard to the literals
+cnfPushNegation :: Expr -> Expr
 cnfPushNegation (Negation a) = case a of
                 Negation i -> cnfPushNegation i
                 Conjunction i j -> Disjunction (cnfPushNegation (Negation i)) (cnfPushNegation (Negation j))
@@ -92,16 +93,6 @@ cnfReplace e = cnfPushNegation $ cnfLimit e
 -- | distribute disjunction over conjunction wherever possible
 cnfDist :: Expr -> Expr
 cnfDist (Conjunction a b) = Conjunction (cnfDist a) (cnfDist b)
-{-
-cnfDist (Disjunction (Conjunction a b) (Conjunction c d))
-      = Conjunction 
-          (Conjunction 
-              (cnfDist $ Disjunction a c) 
-              (cnfDist $ Disjunction b c)) 
-          (Conjunction 
-              (cnfDist $ Disjunction a d) 
-              (cnfDist $ Disjunction b d))
--}
 cnfDist (Disjunction (Conjunction x y) a) = Conjunction (cnfDist $ Disjunction x a) (cnfDist $ Disjunction y a)
 cnfDist (Disjunction a (Conjunction x y)) = Conjunction (cnfDist $ Disjunction a x) (cnfDist $ Disjunction a y)
 cnfDist (Disjunction a b) = let
@@ -112,9 +103,7 @@ cnfDist (Disjunction a b) = let
             cnfDist $ Disjunction a' b'
         else
             Disjunction a' b'
-
--- variables and negations
-cnfDist x = x
+cnfDist x = x -- variables and negations
 
 -- | Convert any propositional logic string to conjunctive normal form.
 toCnf :: Expr -> Expr
