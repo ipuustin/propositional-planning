@@ -81,20 +81,6 @@ compoundExpr n = do
 instance Arbitrary Expr where
     arbitrary = sized compoundExpr
 
-{-
-instance Arbitrary Expr where
-    arbitrary = oneof [
-                        return $ Variable "A",
-                        return $ Variable "B",
-                        return $ Variable "C",
-                        return $ Variable "D",
-                        liftM Negation arbitrary,
-                        liftM2 Conjunction arbitrary arbitrary,
-                        liftM2 Disjunction arbitrary arbitrary,
-                        liftM2 Implication arbitrary arbitrary,
-                        liftM2 Biconditional arbitrary arbitrary
-                       ]
--}
 
 -- quickcheck contradict
 prop_iscontradiction e = if isTautology e
