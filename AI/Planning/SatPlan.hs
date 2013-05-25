@@ -146,8 +146,8 @@ createMapping expr = let vs = List.nub $ exprWalk show expr
 
 translateToExpr :: Problem -> Int -> Maybe Expr
 translateToExpr (Problem initials actions goals) tmax = let
-          i:is = map (toCnf . toLVar 0) initials
-          g:gs = map (toCnf . toLVar tmax) goals
+          i:is = map (cnfReplace . toLVar 0) initials
+          g:gs = map (cnfReplace . toLVar tmax) goals
           fluents = List.nub $ findFluents actions ++ initials ++ goals
           startexpr = foldl Conjunction i is
           successorexpr = findAllSuccessors actions fluents (tmax-1)
