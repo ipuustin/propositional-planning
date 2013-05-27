@@ -15,7 +15,7 @@ module Main
 where
 
 import AI.Planning as Plan
-import AI.Planning.SatPlan
+-- import AI.Planning.SatPlan as SatPlan
 import Problems
 
 import Data.List
@@ -37,6 +37,8 @@ runTest test = case test of
         case runSat flprob 10 of
             Just a -> putStrLn $ "Flashlight problem: " ++ show a
             Nothing -> putStrLn "Flashlight problem: no plan found"
+{-
+    -- Block world tets are being moved to automatic testing
     "bwprob1" ->
         case runSat bwprob1 10 of
             Just a -> putStrLn $ "Block World problem 1: " ++ show a
@@ -49,6 +51,7 @@ runTest test = case test of
         case runSat bwprob3 10 of
             Just a -> putStrLn $ "Block World problem 3: " ++ show a
             Nothing -> putStrLn "Block World problem 3: no plan found"
+-}
     _ -> putStrLn $ "Unknown test case " ++ test
 
 
@@ -121,3 +124,83 @@ prop_cnfpushnegation e =
         e' = Plan.cnfPushNegation $ cnfReplace e
     in
         isCnfNegationPushed e' && isEquivalent e e'
+
+
+
+-- generate test problems in BlockWorld domain
+-- block world -- (http://icaps06.icaps-conference.org/dc-papers/paper5.pdf)
+
+assignVariables :: String -> [String] -> String
+assignVariables fn vs = fn ++ "(" ++ intercalate "," vs ++ ")"
+
+emptySlot :: [String] -> String -> [Expr]
+emptySlot bs s = [ Negation $ Variable ("In("++b++","++s++")") | b <- bs ]
+
+setBoxToSlot bs s b = boxInSlot : otherBoxes
+    where boxInSlot = Variable ("In("++b++","++s++")")
+          otherBoxes = [ Negation $ Variable ("In("++ob++","++s++")") | ob <- bs, ob /= b ]
+
+emptyHandler bs = [ Negation $ Variable ("Holding("++b++")") | b <- bs ]
+
+setBoxToHandler b bs = boxInHandler : otherBoxes
+    where boxInHandler = Variable ("Holding("++b++")")
+          otherBoxes = [ Negation $ Variable ("Holding("++ob++")") | ob <- bs, ob /= b ]
+
+getBox :: Char -> String
+getBox a = head $ generateVariables "box" [a]
+
+getSlot :: Integer -> String
+getSlot x = head $ generateVariables "slot" [x]
+
+generateActions :: [String] -> [String] -> [Action]
+generateActions ss bs = pickups ++ putdowns
+    where pickups  = [ Action ("Pickup("++b++","++s++")")
+                             (pickupPreconditions s b)
+                             (pickupEffects s b)
+                             1
+                    | b <- bs, s <- ss ]
+          putdowns = [ Action ("Putdown("++b++","++s++")")
+                             (putdownPreconditions s b)
+                             (putdownEffects s b)
+                             1
+                    | b <- bs, s <- ss ]
+
+          pickupPreconditions s b = setBoxToSlot bs s b ++ emptyHandler bs
+          pickupEffects s b = emptySlot bs s ++ setBoxToHandler b bs
+
+          putdownPreconditions s b = setBoxToHandler b bs ++ emptySlot bs s
+          putdownEffects s b = setBoxToSlot bs s b ++ emptyHandler bs
+
+{-
+  1. generate a set of boxes and slots
+  2. from these boxes and slots, choose initial state and goal state and generate the actions
+-}
+
+-- | Put boxes to slots and set the handler to empty
+initState :: [String] -> [String] -> [Expr]
+initState bs ss = emptyHandler bs ++ slotData ss bs
+      where slotData ss bs = emptySlots ss bs ++ fullSlots ss bs
+            emptySlots ss bs = concat $ map (emptySlot bs) $ (drop (length bs) ss)
+            fullSlots ss bs = concat $ map (processPair bs) (zip ss bs)
+            processPair bs (slot, box) = setBoxToSlot bs slot box
+
+-- | Generate initial and end states. Everything needs to be done inside one
+-- Gen monad, since the states are interdependent.
+generateStates :: [String] -> [[Char]] -> Gen ([Expr], [Expr])
+generateStates bs ss = do
+      let allSlots = permutations ss
+      initialSlots <- elements allSlots
+      goalSlots <- elements allSlots
+      let initialState = initState bs initialSlots
+      let goalState = initState bs goalSlots
+      return (initialState, goalState)
+
+-- generate instances of Problem with different begin and end states
+instance Arbitrary Problem where
+      arbitrary = do
+                  (bwinitialstate, bwgoalstate) <- generateStates bs ss
+                  return $ Problem bwinitialstate bwactions bwgoalstate
+          where bs = Plan.generateVariables "box" [1 .. length ss - 2 ] -- 4
+                ss = Plan.generateVariables "slot" ['a' .. 'f'] -- 6
+                bwactions = generateActions ss bs
+

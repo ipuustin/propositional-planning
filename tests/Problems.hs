@@ -16,10 +16,7 @@ module Problems (ActionData(..),
                           Expr(..),
                           Problem(..),
                           runSat,
-                          flprob,
-                          bwprob1,
-                          bwprob2,
-                          bwprob3)
+                          flprob)
 
 where
 
@@ -103,6 +100,10 @@ goalstate3 = [Negation (Variable "Effect()")]
 prob3 = Problem initialstate3 actions3 goalstate3
 
 
+{-
+
+-- TODO: these are being moved to automatic testing, see if any interesting
+-- manual cases are required.
 
 assignVariables :: String -> [String] -> String
 assignVariables fn vs = fn ++ "(" ++ intercalate "," vs ++ ")"
@@ -179,3 +180,4 @@ bwstate2b = setBoxToHandler (getBox 'a') boxes ++ slot3 ++ slot2 ++ slot1
 -- not working!
 bwprob1b = Problem bwstate1 bwactions bwstate2b
 
+-}
