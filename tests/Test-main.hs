@@ -32,7 +32,9 @@ runTest test = case test of
                     putStrLn "CNF negation pushing:"
                     quickCheck prop_cnfpushnegation
                     putStrLn "CNF:"
-                    quickCheckWith (stdArgs{maxSize = 17}) prop_iscnf
+                    quickCheckWith (stdArgs{maxSize = 10}) prop_iscnf
+                    putStrLn "Problem solution founding:"
+                    quickCheck prop_solutionfound
     "flprob" ->
         case runSat flprob 10 of
             Just a -> putStrLn $ "Flashlight problem: " ++ show a
@@ -200,7 +202,15 @@ instance Arbitrary Problem where
       arbitrary = do
                   (bwinitialstate, bwgoalstate) <- generateStates bs ss
                   return $ Problem bwinitialstate bwactions bwgoalstate
-          where bs = Plan.generateVariables "box" [1 .. length ss - 2 ] -- 4
-                ss = Plan.generateVariables "slot" ['a' .. 'f'] -- 6
+          where bs = Plan.generateVariables "box" [1 .. length ss - 1 ] -- 2
+                ss = Plan.generateVariables "slot" ['a' .. 'c'] -- 3
                 bwactions = generateActions ss bs
 
+
+-- | Check if solutions are found to example problems (should be but currently
+-- isn't -- there's a bug somewhere !)
+prop_solutionfound p =
+      let r = runSat p 15
+      in case r of
+          Just as -> True
+          Nothing -> False
