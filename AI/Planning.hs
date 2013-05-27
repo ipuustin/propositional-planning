@@ -32,7 +32,6 @@ import qualified Data.Map as Map
 import qualified Data.List as List
 import Control.Monad
 
-
 type Cost = Int
 type Precondition = Expr
 type Effect = Expr
@@ -65,6 +64,7 @@ data Action = Action String [Precondition] [Effect] Cost
 -- | The problem is the initial state, list of possible actions, and the
 -- desired goal state.
 data Problem = Problem [Expr] [Action] [Expr]
+            deriving (Show, Eq)
 
 -- helper functions
 
