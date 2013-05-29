@@ -7,7 +7,7 @@ the moment the algorithm implemented is "planning as satisfiability"
 
 Some example problems are located in "tests" directory. For instance, to
 solve the flashlight battery loading test problem, load the
-tests/Test-problems.hs file and say:
+tests/Problems.hs file and say:
 
     runSat flprob 10
 
