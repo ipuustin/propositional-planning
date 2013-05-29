@@ -136,17 +136,17 @@ assignVariables :: String -> [String] -> String
 assignVariables fn vs = fn ++ "(" ++ intercalate "," vs ++ ")"
 
 emptySlot :: [String] -> String -> [Expr]
-emptySlot bs s = [ Negation $ Variable ("In("++b++","++s++")") | b <- bs ]
+emptySlot bs s = [ Negation $ Variable $ assignVariables "In" [b, s] | b <- bs ]
 
 setBoxToSlot bs s b = boxInSlot : otherBoxes
-    where boxInSlot = Variable ("In("++b++","++s++")")
-          otherBoxes = [ Negation $ Variable ("In("++ob++","++s++")") | ob <- bs, ob /= b ]
+    where boxInSlot = Variable $ assignVariables "In" [b, s]
+          otherBoxes = [ Negation $ Variable $ assignVariables "In" [ob, s] | ob <- bs, ob /= b ]
 
-emptyHandler bs = [ Negation $ Variable ("Holding("++b++")") | b <- bs ]
+emptyHandler bs = [ Negation $ Variable $ assignVariables "Holding" [b] | b <- bs ]
 
 setBoxToHandler b bs = boxInHandler : otherBoxes
-    where boxInHandler = Variable ("Holding("++b++")")
-          otherBoxes = [ Negation $ Variable ("Holding("++ob++")") | ob <- bs, ob /= b ]
+    where boxInHandler = Variable $ assignVariables "Holding" [b]
+          otherBoxes = [ Negation $ Variable $ assignVariables "Holding" [ob] | ob <- bs, ob /= b ]
 
 getBox :: Char -> String
 getBox a = head $ generateVariables "box" [a]
