@@ -15,12 +15,16 @@ module AI.Planning.SatPlan (Action(..),
                             ActionData(..),
                             Expr(..),
                             runSat,
-                            satSolve)
+                            runSat',
+                            satSolve,
+                            satSolve')
 
 where
 
 import AI.Planning
 
+import Data.Tuple
+import Data.Array.Unboxed
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.List as List
@@ -32,6 +36,13 @@ import Text.Regex
 
 -- package incremental-sat-solver
 import Data.Boolean.SatSolver as Sat
+
+-- package toysolver
+import SAT
+import SAT.Types
+import Control.Monad
+import System.IO
+import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 -- Map the levels to literals and the other way around
 type VariableMap = (Map Int String, Map String Int)
@@ -85,7 +96,7 @@ findSuccessors as fs t = let
           doers f = filter (hasInEffects f) as
           undoers f = filter (hasInEffects $ cnfReplace $ Negation f) as
           hasInEffects f a = f `elem` effects a -- FIXME: do a tautology check? benchmark?
-          -- hasInEffects f a = any isTautology $ map (\x -> Biconditional x f) $ effects a  
+          -- hasInEffects f a = any isTautology $ map (\x -> Biconditional x f) $ effects a
     in
           gatherConjunction axioms
 
@@ -162,11 +173,12 @@ translateToExpr (Problem initials actions goals) tmax = let
 translateToSat :: Problem -> Int -> Maybe (Expr, VariableMap)
 translateToSat prob tmax =
     do
-        cnfexpr <- fmap cnfReplace $ translateToExpr prob tmax
+        cnfexpr <- fmap toCnf $ translateToExpr prob tmax
         let mapping = createMapping cnfexpr
         return (cnfexpr, mapping)
 
 
+-- | Convert problem to format that Data.Boolean.SatSolver understands
 convertToBoolean :: Map String Int -> Expr -> Boolean
 convertToBoolean stoi (Negation a) = Not (convertToBoolean stoi a)
 convertToBoolean stoi (Conjunction a b) = convertToBoolean stoi a :&&: convertToBoolean stoi b
@@ -181,7 +193,7 @@ satSolve :: Problem -> Int -> Maybe [(Int, String)]
 satSolve prob@(Problem _ as _) t = do
                     (expr, vmap) <- translateToSat prob t
                     s <- assertTrue (convertToBoolean (snd vmap) expr) newSatSolver
-                    res <- solve s
+                    res <- Sat.solve s
                     return $ List.sort $ filter isaction $ map (getResultPair res) (Map.toAscList $ fst vmap)
         where look result (idx, s) = do
                     b <- lookupVar idx result
@@ -201,3 +213,72 @@ runSat prob tmax = runSatInstance 0
                     Nothing -> if t < tmax then runSatInstance (t+1) else Nothing
                     result -> result
 
+
+-- | Use ToySolver to solve the problem
+
+getDisjunctions :: Expr -> Map String Int -> [[(Int, Bool)]]
+getDisjunctions (Disjunction a b) m = [ concat (getDisjunctions a m ++ getDisjunctions b m) ]
+getDisjunctions (Conjunction a b) m = getDisjunctions a m ++ getDisjunctions b m
+getDisjunctions (Negation (Variable a)) m = [[(fromMaybe undefined $ Map.lookup (show a) m, False)]]
+getDisjunctions (Variable a) m = [[(fromMaybe undefined $ Map.lookup (show a) m, True)]]
+
+
+addClauses :: Solver -> [[(Int, Bool)]] -> [Var] -> IO ()
+addClauses solver dls tvs = forM_ clauses (addClause solver)
+        where
+              clauses = map addc dls
+              addc = map convertToLiteral
+              convertToLiteral (idx, value) = literal (tvs !! (idx-1)) value
+
+
+look' :: [(Var, Bool)] -> (Int, String) -> Maybe (Int, String)
+look' m (idx, s) = do
+              b <- lookup idx m
+              [lit, level] <- matchRegex reg s
+              return (if b then (read level :: Int, lit) else (-1, ""))
+        where
+              reg = mkRegex "\"(.*)_([0-9]*)\"" -- capture "foobar" and "23" from ""foobar_23""
+
+
+createResult :: [Action] -> Model -> Map Int String -> [(Int, String)]
+createResult as m idxToStr = List.sort $ filter isaction actions
+        where
+              actions = map (fromMaybe undefined . look' ml) $ Map.assocs idxToStr
+              ml = assocs m
+              actionnames = map name as
+              isaction x = snd x `elem` actionnames
+
+
+satSolve' :: Problem -> Int -> IO (Maybe [(Int, String)])
+satSolve' prob@(Problem _ as _) t = do
+              solver <- newSolver
+              -- generate a list of newVars (length variables ce)
+              tvs <- replicateM (length bvs) (newVar solver)
+              -- call addClauses for every disjunction list
+              addClauses solver disjunctionLists tvs
+              ret <- SAT.solve solver
+              if ret
+                then do
+                  m <- SAT.model solver
+                  return $ Just $ createResult as m (fst mapping)
+                else
+                  return Nothing
+        where
+              (ce, mapping) = fromMaybe undefined $ translateToSat prob t
+              variables expr = List.nub $ exprWalk id expr
+              bvs = variables ce
+              -- map the variables to newVar indexes
+              -- indexMapping = zip bvs [1..]
+              -- create variable lists from the disjunctions in the cnfexpr
+              disjunctionLists = getDisjunctions ce (snd mapping)
+
+
+runSat' :: Problem -> Int -> IO (Maybe [(Int, String)])
+runSat' prob tmax = runSatInstance 0
+        where runSatInstance t = do
+                r <- satSolve' prob t
+                case r of
+                    Nothing -> if t < tmax
+                        then runSatInstance (t+1)
+                        else return Nothing
+                    result -> return result

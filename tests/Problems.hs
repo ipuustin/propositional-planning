@@ -100,8 +100,6 @@ goalstate3 = [Negation (Variable "Effect()")]
 prob3 = Problem initialstate3 actions3 goalstate3
 
 
-{-
-
 -- TODO: these are being moved to automatic testing, see if any interesting
 -- manual cases are required.
 
@@ -180,4 +178,3 @@ bwstate2b = setBoxToHandler (getBox 'a') boxes ++ slot3 ++ slot2 ++ slot1
 -- not working!
 bwprob1b = Problem bwstate1 bwactions bwstate2b
 
--}
