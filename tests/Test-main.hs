@@ -15,12 +15,13 @@ module Main
 where
 
 import AI.Planning as Plan
--- import AI.Planning.SatPlan as SatPlan
+import AI.Planning.SatPlan as SatPlan
 import Problems
 
 import Data.List
 import System.Environment
 import Test.QuickCheck
+import Test.QuickCheck.Monadic
 import Control.Monad
 
 -- main program
@@ -34,7 +35,7 @@ runTest test = case test of
                     putStrLn "CNF:"
                     quickCheckWith (stdArgs{maxSize = 10}) prop_iscnf
                     putStrLn "Problem solution founding:"
-                    quickCheck prop_solutionfound
+                    quickCheck prop_toysolver
     "flprob" ->
         case runSat flprob 10 of
             Just a -> putStrLn $ "Flashlight problem: " ++ show a
@@ -107,8 +108,8 @@ iscnf (Disjunction a b) = (iscnf a) && (iscnf b)
 iscnf (Implication a b) = False
 iscnf (Biconditional a b) = False
 
-prop_iscnf e = 
-    let 
+prop_iscnf e =
+    let
         e' = toCnf e
     in
         iscnf e' && isEquivalent e e'
@@ -214,3 +215,8 @@ prop_solutionfound p =
       in case r of
           Just as -> True
           Nothing -> False
+
+-- | Test creating solutions with toysolver
+prop_toysolver p = monadicIO $ do
+      r <- run $ runSat' p 15
+      assert $ r /= Nothing

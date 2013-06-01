@@ -19,7 +19,11 @@ import Criterion.Main
 import Data.List
 
 main = defaultMain [
-        bench "flashlight problem" $ nf (runSat flprob) 10,
-        bench "block world problem 2" $ nf (runSat bwprob2) 10,
-        bench "block world problem 3" $ nf (runSat bwprob3) 10
+        bench "flashlight problem (using incremental-sat-solver)" $ nf (runSat flprob) 10,
+        bench "block world problem 2 (using incremental-sat-solver)" $ nf (runSat bwprob2) 10,
+        bench "block world problem 3 (using incremental-sat-solver)" $ nf (runSat bwprob3) 10,
+        bench "flashlight problem (using toysolver)" $ nfIO $ runSat' flprob 10,
+        bench "block world problem 1 (using toysolver)" $ nfIO $ runSat' bwprob1 10,
+        bench "block world problem 2 (using toysolver)" $ nfIO $ runSat' bwprob2 10,
+        bench "block world problem 3 (using toysolver)" $ nfIO $ runSat' bwprob3 10
     ]

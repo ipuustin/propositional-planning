@@ -16,7 +16,10 @@ module Problems (ActionData(..),
                           Expr(..),
                           Problem(..),
                           runSat,
-                          flprob)
+                          flprob,
+                          bwprob1,
+                          bwprob2,
+                          bwprob3)
 
 where
 
