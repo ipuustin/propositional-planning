@@ -79,7 +79,7 @@ cnfPushNegation (Conjunction a b) = Conjunction (cnfPushNegation a) (cnfPushNega
 cnfPushNegation (Disjunction a b) = Disjunction (cnfPushNegation a) (cnfPushNegation b)
 cnfPushNegation x = x
 
--- | replace the biconditionals and conditionals
+-- | replace the biconditionals and implications
 cnfLimit :: Expr -> Expr
 cnfLimit (Negation a) = Negation $ cnfLimit a
 cnfLimit (Implication a b) = cnfLimit $ Disjunction (Negation a) b
@@ -88,6 +88,9 @@ cnfLimit (Conjunction a b) = Conjunction (cnfLimit a) (cnfLimit b)
 cnfLimit (Disjunction a b) = Disjunction (cnfLimit a) (cnfLimit b)
 cnfLimit (Variable x) = Variable x
 
+
+-- | replace biconditionals and implications, push negations  
+cnfReplace :: Expr -> Expr
 cnfReplace e = cnfPushNegation $ cnfLimit e
 
 -- | distribute disjunction over conjunction wherever possible
@@ -160,11 +163,12 @@ isTautology expr = let
     in
           all (exprEval expr) mappings
 
+{-
 -- TODO: suspicious, write tests
 removeDuplicates :: [Expr] -> [Expr]
 removeDuplicates [] = []
 removeDuplicates (e:es) = e : removeDuplicates (filter (\y -> not(isTautology $ Biconditional e y)) es)
-
+-}
 
 -- generate variable names given name and possible values
 generateVariables :: Show a => String -> [a] -> [String]

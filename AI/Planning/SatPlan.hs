@@ -23,7 +23,6 @@ where
 
 import AI.Planning
 
-import Data.Tuple
 import Data.Array.Unboxed
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -39,10 +38,7 @@ import Data.Boolean.SatSolver as Sat
 
 -- package toysolver
 import SAT
-import SAT.Types
 import Control.Monad
-import System.IO
-import qualified Language.CNF.Parse.ParseDIMACS as DIMACS
 
 -- Map the levels to literals and the other way around
 type VariableMap = (Map Int String, Map String Int)
@@ -197,8 +193,8 @@ satSolve prob@(Problem _ as _) t = do
                     return $ List.sort $ filter isaction $ map (getResultPair res) (Map.toAscList $ fst vmap)
         where look result (idx, s) = do
                     b <- lookupVar idx result
-                    [literal, level] <- matchRegex reg s
-                    return (if b then (read level :: Int, literal) else (-1, ""))
+                    [lit, level] <- matchRegex reg s
+                    return (if b then (read level :: Int, lit) else (-1, ""))
               getResultPair result pair = fromMaybe undefined $ look result pair
               actionnames = map name as
               isaction x = snd x `elem` actionnames
@@ -267,8 +263,6 @@ satSolve' prob@(Problem _ as _) t = do
               (ce, mapping) = fromMaybe undefined $ translateToSat prob t
               variables expr = List.nub $ exprWalk id expr
               bvs = variables ce
-              -- map the variables to newVar indexes
-              -- indexMapping = zip bvs [1..]
               -- create variable lists from the disjunctions in the cnfexpr
               disjunctionLists = getDisjunctions ce (snd mapping)
 
