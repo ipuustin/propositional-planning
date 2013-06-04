@@ -34,8 +34,10 @@ runTest test = case test of
                     quickCheck prop_cnfpushnegation
                     putStrLn "CNF:"
                     quickCheckWith (stdArgs{maxSize = 10}) prop_iscnf
-                    putStrLn "Problem solution founding:"
+                    putStrLn "Problem solutions with toysolver:"
                     quickCheck prop_toysolver
+                    putStrLn "Problem solutions with surely:"
+                    quickCheck prop_surely
     "flprob" ->
         case runSat flprob 10 of
             Just a -> putStrLn $ "Flashlight problem: " ++ show a
@@ -212,6 +214,12 @@ instance Arbitrary Problem where
 -- isn't -- there's a bug somewhere !)
 prop_solutionfound p =
       let r = runSat p 15
+      in case r of
+          Just as -> True
+          Nothing -> False
+
+prop_surely p =
+      let r = runSatSurely p 15
       in case r of
           Just as -> True
           Nothing -> False

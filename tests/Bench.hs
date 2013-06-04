@@ -25,5 +25,9 @@ main = defaultMain [
         bench "flashlight problem (using toysolver)" $ nfIO $ runSat' flprob 10,
         bench "block world problem 1 (using toysolver)" $ nfIO $ runSat' bwprob1 10,
         bench "block world problem 2 (using toysolver)" $ nfIO $ runSat' bwprob2 10,
-        bench "block world problem 3 (using toysolver)" $ nfIO $ runSat' bwprob3 10
+        bench "block world problem 3 (using toysolver)" $ nfIO $ runSat' bwprob3 10,
+        bench "flashlight problem (using Surely)" $ nf  (runSatSurely flprob) 10,
+        bench "block world problem 1 (using Surely)" $ nf (runSatSurely bwprob1) 10,
+        bench "block world problem 2 (using Surely)" $ nf (runSatSurely bwprob2) 10,
+        bench "block world problem 3 (using Surely)" $ nf (runSatSurely bwprob3) 10
     ]

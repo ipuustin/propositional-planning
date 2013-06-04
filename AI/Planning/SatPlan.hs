@@ -16,8 +16,10 @@ module AI.Planning.SatPlan (Action(..),
                             Expr(..),
                             runSat,
                             runSat',
+                            runSatSurely,
                             satSolve,
-                            satSolve')
+                            satSolve',
+                            satSolveSurely)
 
 where
 
@@ -35,6 +37,9 @@ import Text.Regex
 
 -- package incremental-sat-solver
 import Data.Boolean.SatSolver as Sat
+
+-- package surely
+import AI.Surely as Surely
 
 -- package toysolver
 import SAT
@@ -210,6 +215,10 @@ runSat prob tmax = runSatInstance 0
                     result -> result
 
 
+dlToNegativeInts :: [[(Int, Bool)]] -> [[Integer]]
+dlToNegativeInts = map (map convertTuple)
+        where convertTuple (i, b) = toInteger $ if b then i else -i
+
 -- | Use ToySolver to solve the problem
 
 getDisjunctions :: Expr -> Map String Int -> [[(Int, Bool)]]
@@ -276,3 +285,42 @@ runSat' prob tmax = runSatInstance 0
                         then runSatInstance (t+1)
                         else return Nothing
                     result -> return result
+
+-- | Trying out the Surely package (https://github.com/gatlin/surely)
+
+lookSurely :: Map Int String -> Integer -> Maybe (Int, String)
+lookSurely idxToStr i = do
+              s <- Map.lookup (abs $ fromIntegral i) idxToStr
+              [lit, level] <- matchRegex reg s
+              return (if isTrue then (read level :: Int, lit) else (-1, ""))
+        where
+              reg = mkRegex "\"(.*)_([0-9]*)\"" -- capture "foobar" and "23" from ""foobar_23""
+              isTrue = i > 0
+
+
+createSurelyResult :: [Action] -> [Integer] -> Map Int String -> [(Int, String)]
+createSurelyResult as m idxToStr = List.sort $ filter isaction rActions
+        where
+              rActions = map (fromMaybe undefined . (lookSurely idxToStr)) m
+              actionnames = map name as
+              isaction x = snd x `elem` actionnames
+
+
+satSolveSurely :: Problem -> Int -> Maybe [(Int, String)]
+satSolveSurely prob@(Problem _ as _) t = do
+              r <- Surely.solve intLists
+              return $ createSurelyResult as r (fst mapping)
+        where
+              (ce, mapping) = fromMaybe undefined $ translateToSat prob t
+              variables expr = List.nub $ exprWalk id expr
+              bvs = variables ce
+              -- create variable lists from the disjunctions in the cnfexpr
+              disjunctionLists = getDisjunctions ce (snd mapping)
+              intLists = dlToNegativeInts disjunctionLists
+
+
+runSatSurely :: Problem -> Int -> Maybe [(Int, String)]
+runSatSurely prob tmax = runSatInstance 0
+        where runSatInstance t = case satSolveSurely prob t of
+                    Nothing -> if t < tmax then runSatInstance (t+1) else Nothing
+                    result -> result

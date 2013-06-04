@@ -16,7 +16,7 @@ Build-type:          Simple
 
 Library
   Exposed-modules:   AI.Planning, AI.Planning.SatPlan
-  Build-depends:     base, regex-compat, containers, incremental-sat-solver, toysolver, parse-dimacs, array
+  Build-depends:     base, regex-compat, containers, incremental-sat-solver, toysolver, parse-dimacs, array, surely
   -- Other-modules:
   -- Build-tools:
 
