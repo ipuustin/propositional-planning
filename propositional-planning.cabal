@@ -29,8 +29,7 @@ benchmark planning-bench
                     criterion,
                     QuickCheck,
                     random
-  ghc-options:      -Wall
-                    -O2
+  ghc-options:      -Wall, -Werror, -O2
 
 Test-Suite planning-test
   type:             exitcode-stdio-1.0
@@ -43,4 +42,3 @@ Test-Suite planning-test
 Source-Repository head
   type:             git
   location:         git://github.com/ipuustin/propositional-planning.git
-
