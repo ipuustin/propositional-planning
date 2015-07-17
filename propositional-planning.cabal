@@ -8,7 +8,7 @@ License:             BSD3
 License-file:        LICENSE
 Author:              Ismo Puustinen
 Maintainer:          ismo@iki.fi
-Copyright: Copyright (C) 2012 Ismo Puustinen
+Copyright: Copyright (C) 2012-2015 Ismo Puustinen
 Category:            AI
 Extra-source-files:  README.md
 Cabal-version:       >=1.2
@@ -16,7 +16,7 @@ Build-type:          Simple
 
 Library
   Exposed-modules:   AI.Planning, AI.Planning.SatPlan
-  Build-depends:     base, regex-compat, containers, incremental-sat-solver, toysolver, parse-dimacs, array
+  Build-depends:     base, regex-compat, containers, minisat, parse-dimacs, array
   -- Other-modules:
   -- Build-tools:
 
