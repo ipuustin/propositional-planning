@@ -15,9 +15,7 @@ module AI.Planning.SatPlan (Action(..),
                             ActionData(..),
                             Expr(..),
                             runSat,
-                            runSat',
-                            satSolve,
-                            satSolve')
+                            satSolve)
 
 where
 
@@ -33,12 +31,9 @@ import Text.Regex
 
 -- import Debug.Trace
 
--- package incremental-sat-solver
-import Data.Boolean.SatSolver as Sat
-
--- package toysolver
-import SAT
 import Control.Monad
+
+import qualified MiniSat as M
 
 -- Map the levels to literals and the other way around
 type VariableMap = (Map Int String, Map String Int)
@@ -95,7 +90,6 @@ findSuccessors as fs t = let
           -- hasInEffects f a = any isTautology $ map (\x -> Biconditional x f) $ effects a
     in
           gatherConjunction axioms
-
 
 
 -- | effects of one action are in contradiction with preconditions of another action
@@ -174,6 +168,49 @@ translateToSat prob tmax =
         return (cnfexpr, mapping)
 
 
+-- here starts the solver-specific part
+
+addClauses :: M.Solver -> [[(Int, Bool)]] -> [M.Lit] -> IO ()
+addClauses solver dls tvs = forM_ clauses (M.addClause solver)
+    where
+        clauses = map addc dls
+        addc = map convertToLiteral
+        convertToLiteral (idx, value) = literal (tvs !! (idx-1)) value
+        literal:: M.Lit -> Bool -> M.Lit
+        literal var value = do
+            if value
+              then var
+              else M.neg var
+
+satSolve :: Problem -> Int -> IO (Maybe [(Int, String)])
+satSolve prob@(Problem _ as _) t = do
+          solver <- M.newSolver
+          -- generate a list of newVars (length variables ce)
+          tvs <- replicateM (length bvs) (M.newLit solver)
+          -- call addClauses for every disjunction list
+          addClauses solver disjunctionLists tvs
+          ret <- M.solve solver tvs
+          return Nothing
+    where
+          (ce, mapping) = fromMaybe undefined $ translateToSat prob t
+          variables expr = List.nub $ exprWalk id expr
+          bvs = variables ce
+          -- create variable lists from the disjunctions in the cnfexpr
+          disjunctionLists = getDisjunctions ce (snd mapping)
+
+
+runSat :: Problem -> Int -> IO (Maybe [(Int, String)])
+runSat prob tmax = runSatInstance 0
+        where runSatInstance t = do
+                r <- satSolve prob t
+                case r of
+                    Nothing -> if t < tmax
+                        then runSatInstance (t+1)
+                        else return Nothing
+                    result -> return result
+
+{-
+
 -- | Convert problem to format that Data.Boolean.SatSolver understands
 convertToBoolean :: Map String Int -> Expr -> Boolean
 convertToBoolean stoi (Negation a) = Not (convertToBoolean stoi a)
@@ -209,8 +246,7 @@ runSat prob tmax = runSatInstance 0
                     Nothing -> if t < tmax then runSatInstance (t+1) else Nothing
                     result -> result
 
-
--- | Use ToySolver to solve the problem
+-}
 
 getDisjunctions :: Expr -> Map String Int -> [[(Int, Bool)]]
 getDisjunctions (Disjunction a b) m = [ concat (getDisjunctions a m ++ getDisjunctions b m) ]
@@ -219,13 +255,7 @@ getDisjunctions (Negation (Variable a)) m = [[(fromMaybe undefined $ Map.lookup 
 getDisjunctions (Variable a) m = [[(fromMaybe undefined $ Map.lookup (show a) m, True)]]
 
 
-addClauses :: Solver -> [[(Int, Bool)]] -> [Var] -> IO ()
-addClauses solver dls tvs = forM_ clauses (addClause solver)
-        where
-              clauses = map addc dls
-              addc = map convertToLiteral
-              convertToLiteral (idx, value) = literal (tvs !! (idx-1)) value
-
+{-
 
 look' :: [(Var, Bool)] -> (Int, String) -> Maybe (Int, String)
 look' m (idx, s) = do
@@ -243,7 +273,6 @@ createResult as m idxToStr = List.sort $ filter isaction actions
               ml = assocs m
               actionnames = map name as
               isaction x = snd x `elem` actionnames
-
 
 satSolve' :: Problem -> Int -> IO (Maybe [(Int, String)])
 satSolve' prob@(Problem _ as _) t = do
@@ -276,3 +305,4 @@ runSat' prob tmax = runSatInstance 0
                         then runSatInstance (t+1)
                         else return Nothing
                     result -> return result
+-}
