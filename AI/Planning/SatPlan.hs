@@ -26,7 +26,7 @@ import qualified Data.Map as Map
 import qualified Data.List as List
 import Data.Maybe
 
--- import Debug.Trace
+import Debug.Trace
 
 import Control.Monad
 
@@ -158,8 +158,7 @@ translateToExpr (Problem initials actions goals) tmax = let
 
 -- | create the CNF and the mapping from the problem
 translateToSat :: Problem -> Int -> Maybe (Expr, VariableMap)
-translateToSat prob tmax =
-    do
+translateToSat prob tmax = do
         cnfexpr <- fmap toCnf $ translateToExpr prob tmax
         let mapping = createMapping cnfexpr
         return (cnfexpr, mapping)
@@ -183,10 +182,24 @@ satSolve prob@(Problem _ as _) t = do
           solver <- M.newSolver
           -- generate a list of newVars (length variables ce)
           tvs <- replicateM (length bvs) (M.newLit solver)
+          print disjunctionLists
           -- call addClauses for every disjunction list
           addClauses solver disjunctionLists tvs
-          ret <- M.solve solver tvs
-          return Nothing
+
+          ret <- M.solve solver []
+
+          trace (show ret) $ return ()
+
+          if ret
+            then do
+              vs <- mapM (M.modelValue solver) tvs
+              print vs
+              M.deleteSolver solver
+              return Nothing
+
+            else do
+              M.deleteSolver solver
+              return Nothing
     where
           (ce, mapping) = fromMaybe undefined $ translateToSat prob t
           variables expr = List.nub $ exprWalk id expr
