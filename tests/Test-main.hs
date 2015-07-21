@@ -35,9 +35,10 @@ runTest test = case test of
                     putStrLn "CNF:"
                     quickCheckWith (stdArgs{maxSize = 10}) prop_iscnf
                     putStrLn "Problem solution founding:"
-                    quickCheck prop_toysolver
-    "flprob" ->
-        case runSat flprob 10 of
+                    quickCheck prop_solutionfound
+    "flprob" -> do
+        r <- runSat flprob 10
+        case r of
             Just a -> putStrLn $ "Flashlight problem: " ++ show a
             Nothing -> putStrLn "Flashlight problem: no plan found"
 {-
@@ -208,15 +209,7 @@ instance Arbitrary Problem where
                 bwactions = generateActions ss bs
 
 
--- | Check if solutions are found to example problems (should be but currently
--- isn't -- there's a bug somewhere !)
-prop_solutionfound p =
-      let r = runSat p 15
-      in case r of
-          Just as -> True
-          Nothing -> False
-
--- | Test creating solutions with toysolver
-prop_toysolver p = monadicIO $ do
-      r <- run $ runSat' p 15
+-- | Check if solutions are found to example problems.
+prop_solutionfound p = monadicIO $ do
+      r <- run $ runSat p 15
       assert $ r /= Nothing

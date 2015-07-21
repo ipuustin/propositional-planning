@@ -21,13 +21,10 @@ where
 
 import AI.Planning
 
-import Data.Array.Unboxed
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.List as List
 import Data.Maybe
-
-import Text.Regex
 
 -- import Debug.Trace
 
@@ -51,17 +48,17 @@ findFluents = foldl getpreds [] -- contains duplicates?
 
 
 safeGatherConjunction :: [Expr] -> Expr
-safeGatherConjunction (a:[]) = a
+safeGatherConjunction [a] = a
 safeGatherConjunction (a:as) = foldl Conjunction a as
 safeGatherConjunction [] = undefined
 
 gatherConjunction :: [Expr] -> Maybe Expr
-gatherConjunction (a:[]) = Just a
+gatherConjunction ([a]) = Just a
 gatherConjunction [] = Nothing
 gatherConjunction (a:as) = Just $ foldl Conjunction a as
 
 gatherDisjunction :: [Expr] -> Maybe Expr
-gatherDisjunction (a:[]) = Just a
+gatherDisjunction ([a]) = Just a
 gatherDisjunction [] = Nothing
 gatherDisjunction (a:as) = Just $ foldl Disjunction a as
 
@@ -177,8 +174,7 @@ addClauses solver dls tvs = forM_ clauses (M.addClause solver)
         addc = map convertToLiteral
         convertToLiteral (idx, value) = literal (tvs !! (idx-1)) value
         literal:: M.Lit -> Bool -> M.Lit
-        literal var value = do
-            if value
+        literal var value = if value
               then var
               else M.neg var
 
@@ -253,6 +249,7 @@ getDisjunctions (Disjunction a b) m = [ concat (getDisjunctions a m ++ getDisjun
 getDisjunctions (Conjunction a b) m = getDisjunctions a m ++ getDisjunctions b m
 getDisjunctions (Negation (Variable a)) m = [[(fromMaybe undefined $ Map.lookup (show a) m, False)]]
 getDisjunctions (Variable a) m = [[(fromMaybe undefined $ Map.lookup (show a) m, True)]]
+getDisjunctions _ _ = undefined
 
 
 {-
