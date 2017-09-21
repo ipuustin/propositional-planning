@@ -37,7 +37,7 @@ import Text.Regex
 import Data.Boolean.SatSolver as Sat
 
 -- package toysolver
-import SAT
+import ToySolver.SAT
 import Control.Monad
 
 -- Map the levels to literals and the other way around
@@ -252,10 +252,10 @@ satSolve' prob@(Problem _ as _) t = do
               tvs <- replicateM (length bvs) (newVar solver)
               -- call addClauses for every disjunction list
               addClauses solver disjunctionLists tvs
-              ret <- SAT.solve solver
+              ret <- ToySolver.SAT.solve solver
               if ret
                 then do
-                  m <- SAT.model solver
+                  m <- ToySolver.SAT.getModel solver
                   return $ Just $ createResult as m (fst mapping)
                 else
                   return Nothing
